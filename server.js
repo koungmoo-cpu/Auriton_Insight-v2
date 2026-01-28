@@ -1,6 +1,7 @@
 /* ============================================
    🖥️ AI Ultra Dosa Sentinel - Final Secure Server (ESM)
-   Updated: ESM Support, '해요체' Persona, Security & Stability
+   Full Version: No Omissions | Persona: 해요체
+   Fixed: 429 Too Many Requests & Model Stability
    ============================================ */
 
 import 'dotenv/config';
@@ -15,7 +16,7 @@ import https from 'https';
 import http from 'http';
 import fs from 'fs';
 
-// ESM 환경에서 __dirname을 사용하기 위한 설정이에요.
+// ESM 환경 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -55,11 +56,11 @@ app.use(express.json({ limit: '50kb' }));
 app.use(express.urlencoded({ extended: true, limit: '50kb' }));
 
 // ============================================
-// Rate Limiting (AI 악용 방지)
+// Rate Limiting (수정: 테스트를 위해 횟수를 100회로 늘렸어요)
 // ============================================
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 15,
+    max: 100, // 기존 15에서 100으로 상향하여 429 에러를 방지해요.
     message: { success: false, error: '⚠️ SYSTEM OVERHEAT', message: '너무 많은 요청이 들어왔어요. 잠시 후에 다시 시도해 주세요.' },
     keyGenerator: (req) => req.ip || req.connection.remoteAddress
 });
@@ -94,12 +95,13 @@ async function callGeminiAPI(prompt, apiKey) {
     if (!apiKey) throw new Error('System Configuration Error');
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
+        // Simon님이 지정하신 최신 GA 모델을 사용해요.
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const result = await model.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig: { 
                 temperature: 0.75, 
-                maxOutputTokens: 800, 
+                maxOutputTokens: 1000, // 답변이 잘리지 않도록 넉넉히 설정했어요.
                 topP: 0.9
             }
         });

@@ -1,16 +1,19 @@
 {
   "name": "ai-ultra-dosa-sentinel",
+  "version": "2.7.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "main": "server.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
-  "devDependencies": {
-    "@types/node": "^22.19.7",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+  "dependencies": {
+    "@google/generative-ai": "^0.22.0",
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "helmet": "^7.2.0",
+    "express-rate-limit": "^7.4.0"
   }
 }
