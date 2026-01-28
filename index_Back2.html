@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI Ultra Dosa Sentinel - 우주의 궤적을 추적하는 디지털 수호자">
+    <meta name="keywords" content="사주, 명리학, 점성학, 운세, AI, 타로, 도사, 센티널">
+    <title>AI Ultra Dosa Sentinel</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@300;400;500;700&family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    
+    <div class="stars"></div>
+    <div class="twinkling"></div>
+    
+    <header class="site-header">
+        <div class="header-content">
+            <h1 class="site-title">✨ AI Ultra Dosa Sentinel</h1>
+            <p class="site-subtitle">우주의 궤적을 추적하는 디지털 수호자</p>
+        </div>
+    </header>
+    
+    <main class="main-container">
+        
+        <section id="selection-screen" class="screen active">
+            <div class="selection-content">
+                <h2 class="section-title">CHOOSE YOUR DESTINY</h2>
+                <p class="section-desc">운명을 해석할 프로토콜을 선택하십시오</p>
+                
+                <div class="method-grid">
+                    
+                    <div class="method-card saju-card" onclick="selectMethod('saju')">
+                        <div class="card-border"></div>
+                        <div class="card-header">
+                            <div class="card-icon">🔮</div>
+                            <h3 class="card-title">SAJU PROTOCOL</h3>
+                            <p class="card-subtitle">Oriental Destiny Analysis</p>
+                        </div>
+                        
+                        <ul class="card-features">
+                            <li>사주팔자 (Four Pillars) 해석</li>
+                            <li>오행 (Five Elements) 균형</li>
+                            <li>운명의 흐름과 기질 분석</li>
+                            <li>미래 예측 및 전략 수립</li>
+                        </ul>
+                        
+                        <button class="card-button saju-btn">
+                            INITIALIZE <span class="arrow">▶</span>
+                        </button>
+                    </div>
+                    
+                    <div class="method-card astro-card" onclick="selectMethod('astrology')">
+                        <div class="card-border"></div>
+                        <div class="card-header">
+                            <div class="card-icon">🌌</div>
+                            <h3 class="card-title">ASTRO PROTOCOL</h3>
+                            <p class="card-subtitle">Universal Chart Analysis</p>
+                        </div>
+                        
+                        <ul class="card-features">
+                            <li>출생 차트 (Natal Chart) 디코딩</li>
+                            <li>행성 배치와 하우스 분석</li>
+                            <li>내면의 우주와 잠재력 탐색</li>
+                            <li>영적 성장 경로 제시</li>
+                        </ul>
+                        
+                        <button class="card-button astro-btn">
+                            INITIALIZE <span class="arrow">▶</span>
+                        </button>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+        
+        <section id="saju-screen" class="screen">
+            <button class="back-button" onclick="backToSelection()">
+                ◀ ABORT
+            </button>
+            
+            <div class="form-container saju-theme">
+                <div class="form-header">
+                    <h2 class="form-title">SAJU SEQUENCE</h2>
+                    <p class="form-subtitle">Input Temporal Coordinates</p>
+                </div>
+                
+                <form id="saju-form" class="input-form">
+                    
+                    <div class="form-group">
+                        <label class="form-label">CODENAME (Name)</label>
+                        <input 
+                            type="text" 
+                            id="saju-name" 
+                            class="form-input" 
+                            placeholder="성함을 입력하세요 (2~10자)" 
+                            maxlength="10"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">BIOLOGICAL TYPE</label>
+                        <div class="button-group">
+                            <button type="button" class="option-button" data-gender="male">
+                                MALE
+                            </button>
+                            <button type="button" class="option-button" data-gender="female">
+                                FEMALE
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">CALENDAR SYSTEM</label>
+                        <div class="button-group">
+                            <button type="button" class="option-button active" data-calendar="solar">
+                                SOLAR (양력)
+                            </button>
+                            <button type="button" class="option-button" data-calendar="lunar">
+                                LUNAR (음력)
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">DATE OF ORIGIN</label>
+                        <div class="select-group">
+                            <select id="saju-year" class="form-select" required>
+                                <option value="">YEAR</option>
+                            </select>
+                            <select id="saju-month" class="form-select" required>
+                                <option value="">MONTH</option>
+                            </select>
+                            <select id="saju-day" class="form-select" required>
+                                <option value="">DAY</option>
+                            </select>
+                        </div>
+                        
+                        <div id="leap-check" class="checkbox-group" style="display: none;">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="leap-month">
+                                <span class="checkmark"></span>
+                                <span>LEAP MONTH (윤달)</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">TIME OF ORIGIN (Zodiac Hours)</label>
+                        <div class="select-group">
+                            <select id="saju-hour" class="form-select" required style="width: 100%;">
+                                <option value="">출생 시간을 선택하십시오</option>
+                                <option value="자시">자시 (23:30 ~ 01:30)</option>
+                                <option value="축시">축시 (01:30 ~ 03:30)</option>
+                                <option value="인시">인시 (03:30 ~ 05:30)</option>
+                                <option value="묘시">묘시 (05:30 ~ 07:30)</option>
+                                <option value="진시">진시 (07:30 ~ 09:30)</option>
+                                <option value="사시">사시 (09:30 ~ 11:30)</option>
+                                <option value="오시">오시 (11:30 ~ 13:30)</option>
+                                <option value="미시">미시 (13:30 ~ 15:30)</option>
+                                <option value="신시">신시 (15:30 ~ 17:30)</option>
+                                <option value="유시">유시 (17:30 ~ 19:30)</option>
+                                <option value="술시">술시 (19:30 ~ 21:30)</option>
+                                <option value="해시">해시 (21:30 ~ 23:30)</option>
+                                <option value="unknown">모름 (Unknown)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="saju-privacy" required>
+                            <span class="checkmark"></span>
+                            <span>
+                                AGREE TO DATA PROCESSING
+                            </span>
+                        </label>
+                        <p class="form-hint">
+                            // Data will be purged immediately after analysis.
+                        </p>
+                    </div>
+                    
+                    <button type="submit" class="submit-button saju-btn" disabled>
+                        ACTIVATE ANALYSIS
+                    </button>
+                    
+                </form>
+            </div>
+        </section>
+        
+        <section id="astrology-screen" class="screen">
+            <button class="back-button" onclick="backToSelection()">
+                ◀ ABORT
+            </button>
+            
+            <div class="form-container astro-theme">
+                <div class="form-header">
+                    <h2 class="form-title">ASTRO SEQUENCE</h2>
+                    <p class="form-subtitle">Input Cosmic Coordinates</p>
+                </div>
+                
+                <form id="astro-form" class="input-form">
+                    
+                    <div class="form-group">
+                        <label class="form-label">CODENAME (Name)</label>
+                        <input 
+                            type="text" 
+                            id="astro-name" 
+                            class="form-input" 
+                            placeholder="성함을 입력하세요 (2~10자)" 
+                            maxlength="10"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">BIOLOGICAL TYPE</label>
+                        <div class="button-group">
+                            <button type="button" class="option-button" data-gender="male">
+                                MALE
+                            </button>
+                            <button type="button" class="option-button" data-gender="female">
+                                FEMALE
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">DATE OF ORIGIN (Solar Only)</label>
+                        <div class="select-group">
+                            <select id="astro-year" class="form-select" required>
+                                <option value="">YEAR</option>
+                            </select>
+                            <select id="astro-month" class="form-select" required>
+                                <option value="">MONTH</option>
+                            </select>
+                            <select id="astro-day" class="form-select" required>
+                                <option value="">DAY</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">TIME OF ORIGIN</label>
+                        <div class="select-group">
+                            <select id="astro-period" class="form-select" required>
+                                <option value="">PERIOD</option>
+                                <option value="am">AM</option>
+                                <option value="pm">PM</option>
+                                <option value="unknown">모름 (Unknown)</option>
+                            </select>
+                            <select id="astro-hour" class="form-select" required>
+                                <option value="">HOUR</option>
+                            </select>
+                            <select id="astro-minute" class="form-select" required>
+                                <option value="">MIN</option>
+                                <option value="0">00</option>
+                                <option value="15">15</option>
+                                <option value="30">30</option>
+                                <option value="45">45</option>
+                            </select>
+                        </div>
+                        <p class="form-hint">// Precise time increases accuracy.</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">LOCATION COORDINATES</label>
+                        <input 
+                            type="text" 
+                            id="astro-location" 
+                            class="form-input" 
+                            placeholder="예: Seoul, New York"
+                            maxlength="100"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="astro-privacy" required>
+                            <span class="checkmark"></span>
+                            <span>
+                                AGREE TO DATA PROCESSING
+                            </span>
+                        </label>
+                        <p class="form-hint">
+                            // Data will be purged immediately after analysis.
+                        </p>
+                    </div>
+                    
+                    <button type="submit" class="submit-button astro-btn" disabled>
+                        ACTIVATE ANALYSIS
+                    </button>
+                    
+                </form>
+            </div>
+        </section>
+        
+        <section id="result-screen" class="screen">
+            <div class="result-container hud-interface">
+                <div class="hud-corner top-left"></div>
+                <div class="hud-corner top-right"></div>
+                <div class="hud-corner bottom-left"></div>
+                <div class="hud-corner bottom-right"></div>
+                
+                <div class="result-header">
+                    <div class="header-decor"></div>
+                    <h2 id="result-title" class="result-title">ANALYSIS COMPLETE</h2>
+                    <button class="new-analysis-button" onclick="startNewAnalysis()">
+                        RESET SYSTEM
+                    </button>
+                </div>
+                
+                <div id="chat-messages" class="chat-messages hud-grid-bg">
+                    </div>
+                
+                <div class="chat-input-area">
+                    <input 
+                        type="text" 
+                        id="chat-input" 
+                        class="chat-input" 
+                        placeholder="추가 질문을 입력하시오 (최대 500자)"
+                        maxlength="500"
+                    >
+                    <button id="send-button" class="send-button">
+                        TRANSMIT
+                    </button>
+                </div>
+                
+                <div class="scan-line"></div>
+            </div>
+        </section>
+        
+    </main>
+    
+    <footer class="site-footer">
+        <p>© 2025 AI ULTRA DOSA SENTINEL. All systems nominal.</p>
+        <p class="footer-note">
+            SECURE CONNECTION ESTABLISHED. DATA PURGE SCHEDULED.
+        </p>
+    </footer>
+    
+    <script src="js/main.js"></script>
+    <script src="js/saju.js"></script>
+    <script src="js/astrology.js"></script>
+    
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
