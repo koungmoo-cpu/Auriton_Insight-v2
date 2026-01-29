@@ -12,16 +12,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// 1. ESM 환경변수 설정
+// 1. ESM 환경변수 및 경로 설정 (Vercel 호환성 필수)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-
-// 2. 포트 설정 (여기서 딱 한 번만 선언합니다!)
 const PORT = process.env.PORT || 3000;
 
-// 3. Gemini API 설정
+// 2. Gemini API 설정
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
 
@@ -29,12 +27,12 @@ if (!apiKey) {
     console.error("🚨 [SYSTEM] API Key가 설정되지 않았습니다.");
 } else {
     const genAI = new GoogleGenerativeAI(apiKey);
-    model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.0-flash" });
+    model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 }
 
-// 4. 미들웨어 설정
+// 3. 미들웨어 설정
 app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: false, // 인라인 스크립트 허용 (필수)
     crossOriginEmbedderPolicy: false,
 }));
 
@@ -46,12 +44,13 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 📂 정적 파일 경로 설정
-app.use(express.static(__dirname));
+// [중요] 정적 파일 서빙 설정 수정
+// Vercel에서는 루트 경로의 파일들을 명시적으로 서빙해야 합니다.
+app.use(express.static(__dirname)); 
 app.use('/js', express.static(path.join(__dirname, 'js')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-// 도배 방지
+// 도배 방지 (기존 유지)
 const apiLimiter = rateLimit({
     windowMs: 10 * 60 * 1000,
     max: 20, 
@@ -59,7 +58,7 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// 5. 유틸리티 함수
+// 4. 유틸리티 함수 (기존 유지)
 function validateAndSanitize(input) {
     if (typeof input !== 'string') return '';
     return input.trim().replace(/[<>]/g, '').substring(0, 3000);
@@ -83,7 +82,7 @@ async function callGeminiAPI(prompt) {
 }
 
 // ============================================
-// 🎭 페르소나 정의
+// 🎭 페르소나 정의 (기존 내용 복원 완료)
 // ============================================
 
 const BASE_PERSONA = `
@@ -108,12 +107,20 @@ ${BASE_PERSONA}
 // 📡 API 라우트
 // ============================================
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+// 메인 페이지 라우트 (명시적 지정)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // [사주 분석]
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
+        // rawData가 없는 경우 방어 코드 추가
+        if (!rawData || !rawData.userInfo) {
+            throw new Error('사용자 정보가 누락되었습니다.');
+        }
+        
         const safeName = validateAndSanitize(rawData.userInfo.name);
         
         const prompt = `
@@ -124,6 +131,7 @@ app.post('/api/saju/consultation', async (req, res) => {
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -132,6 +140,10 @@ app.post('/api/saju/consultation', async (req, res) => {
 app.post('/api/astrology/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
+        if (!rawData || !rawData.userInfo) {
+            throw new Error('사용자 정보가 누락되었습니다.');
+        }
+
         const safeName = validateAndSanitize(rawData.userInfo.name);
 
         const prompt = `
@@ -142,6 +154,7 @@ app.post('/api/astrology/consultation', async (req, res) => {
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -152,7 +165,7 @@ app.post('/api/saju/chat', async (req, res) => {
         const { userMessage, rawData } = req.body;
         const safeMessage = validateAndSanitize(userMessage);
         
-        const context = rawData ? `(내담자: ${rawData.userInfo.name}님 사주 분석 중)` : '';
+        const context = rawData && rawData.userInfo ? `(내담자: ${rawData.userInfo.name}님 사주 분석 중)` : '';
         const prompt = `${SAJU_SYSTEM}\n${context}\n질문: "${safeMessage}"\n명리학적 관점에서 답변해주세요.`;
         
         const answer = await callGeminiAPI(prompt);
@@ -168,7 +181,7 @@ app.post('/api/astrology/chat', async (req, res) => {
         const { userMessage, rawData } = req.body;
         const safeMessage = validateAndSanitize(userMessage);
 
-        const context = rawData ? `(내담자: ${rawData.userInfo.name}님 점성술 분석 중)` : '';
+        const context = rawData && rawData.userInfo ? `(내담자: ${rawData.userInfo.name}님 점성술 분석 중)` : '';
         const prompt = `${ASTRO_SYSTEM}\n${context}\n질문: "${safeMessage}"\n점성학적 관점에서 별들의 뜻을 전해주세요.`;
         
         const answer = await callGeminiAPI(prompt);
@@ -182,12 +195,11 @@ app.post('/api/astrology/chat', async (req, res) => {
 // 🚀 서버 실행
 // ============================================
 
-// 중복 선언 제거됨: 이미 상단에서 선언한 PORT 변수를 사용합니다.
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
         console.log(`🚀 Local Server running: http://localhost:${PORT}`);
     });
 }
 
-// Vercel Serverless Function을 위한 Export
+// Vercel용 Export
 export default app;
