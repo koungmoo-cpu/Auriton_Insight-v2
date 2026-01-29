@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# 🔒 Secrets (가장 중요: 절대 올리면 안 됨)
+.env
+.env.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

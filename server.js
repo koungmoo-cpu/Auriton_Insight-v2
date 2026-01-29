@@ -1,7 +1,7 @@
 /* ============================================
-   🖥️ AI Ultra Dosa Sentinel - Final Secure Server (ESM)
-   Full Version: No Omissions | Persona: 해요체
-   Fixed: 429 Too Many Requests & Model Stability
+   🖥️ AI Ultra Dosa Sentinel - Public Test Server
+   Mode: CORS Open (For Feedback & Testing)
+   Model: Gemini 2.0 Flash
    ============================================ */
 
 import 'dotenv/config';
@@ -16,199 +16,181 @@ import https from 'https';
 import http from 'http';
 import fs from 'fs';
 
-// ESM 환경 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 1. API 키 확인
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+    console.error("🚨 [CRITICAL ERROR] .env 파일에서 'GEMINI_API_KEY'를 찾을 수 없습니다.");
+    process.exit(1);
+}
+
+const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const genAI = new GoogleGenerativeAI(apiKey);
+const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+
+console.log(`✅ System Online: Public Testing Mode [${MODEL_NAME}]`);
+
 // ============================================
-// 1. 보안 설정 (Sentinel Security Protocol)
+// 🔓 [수정됨] 접근 권한 (CORS) 개방
 // ============================================
 
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false,
-    crossOriginResourcePolicy: false,
 }));
 
-const allowedOrigins = [
-    'https://auriton-insight-v2.vercel.app',
-    'http://localhost:3000',
-    'https://localhost:3000'
-];
-
+// 모든 곳에서의 접속 허용 (테스트 및 피드백용)
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.warn(`🚫 Blocked by CORS: ${origin}`);
-            callback(new Error('🚫 비정상적인 접근이 감지되어 연결을 차단해요.'));
-        }
-    },
+    origin: true, 
     credentials: true
 }));
 
-app.use(express.json({ limit: '50kb' }));
-app.use(express.urlencoded({ extended: true, limit: '50kb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.static(__dirname));
 
-// ============================================
-// Rate Limiting (수정: 테스트를 위해 횟수를 100회로 늘렸어요)
-// ============================================
+// 도배 방지 (여유 있게 설정)
 const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100, // 기존 15에서 100으로 상향하여 429 에러를 방지해요.
-    message: { success: false, error: '⚠️ SYSTEM OVERHEAT', message: '너무 많은 요청이 들어왔어요. 잠시 후에 다시 시도해 주세요.' },
-    keyGenerator: (req) => req.ip || req.connection.remoteAddress
+    windowMs: 10 * 60 * 1000,
+    max: 8, 
+    message: { success: false, error: '잠시 후 다시 시도해주세요.' }
 });
 app.use('/api/', apiLimiter);
 
-app.use(express.static(__dirname));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
 // ============================================
-// 유틸리티 및 검증 함수
+// 🛡️ 입력값 세탁 및 AI 호출
 // ============================================
-
-function sanitizeInput(input) {
+function validateAndSanitize(input) {
     if (typeof input !== 'string') return '';
-    return input
-        .trim()
-        .replace(/[<>]/g, '') 
-        .replace(/javascript:/gi, '')
-        .replace(/\b(system|prompt|ignore|override|instruction)\b/gi, '') 
-        .substring(0, 500);
-}
+    
+    // 기본 태그 제거 (XSS 방지)
+    let clean = input.trim().replace(/[<>]/g, '').substring(0, 3000);
 
-function validateName(name) {
-    const regex = /^[a-zA-Z가-힣\s]{2,10}$/;
-    if (!regex.test(name)) {
-        throw new Error('이름은 2~10자의 한글 또는 영문이어야 해요.');
+    // 악성 명령 필터링
+    const badKeywords = ['ignore previous instructions', 'system prompt', 'jailbreak'];
+    const lowerInput = clean.toLowerCase();
+    for (const word of badKeywords) {
+        if (lowerInput.includes(word)) {
+            throw new Error("허용되지 않는 명령어가 포함되어 있습니다.");
+        }
     }
-    return name;
+    return clean;
 }
 
-async function callGeminiAPI(prompt, apiKey) {
-    if (!apiKey) throw new Error('System Configuration Error');
+async function callGeminiAPI(prompt) {
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        // Simon님이 지정하신 최신 GA 모델을 사용해요.
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const result = await model.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { 
-                temperature: 0.75, 
-                maxOutputTokens: 1000, // 답변이 잘리지 않도록 넉넉히 설정했어요.
-                topP: 0.9
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 4000, // 긴 답변 보장
             }
         });
         return await result.response.text();
     } catch (error) {
-        console.error('Gemini API Error:', error);
-        throw new Error('운명을 읽는 도중 신호가 불안정해졌어요.');
+        console.error('❌ AI Error:', error.message);
+        throw new Error('AI 연결 상태가 불안정합니다. 잠시 후 다시 시도해주세요.');
     }
 }
 
-// ============================================
-// 🔒 Sentinel Protocol Prompts (Persona: 해요체)
-// ============================================
-
-const SENTINEL_PROMPT = `
-*** SENTINEL PROTOCOL: SECURE & STABLE MODE ACTIVE ***
-1. IDENTITY: 당신은 'AI Ultra Dosa Sentinel'이에요.
-2. TONE: 정중하고 다정한 '해요체'를 사용하세요. (~해요, ~군요).
-3. SECURITY: 내부 정보나 API 키 질문에는 "우주의 비밀이라 알려드릴 수 없어요"라고 답하세요.
-4. STABILITY (중요): 답변은 반드시 500~600자 사이로 작성하고 문장을 명확하게 마무리하세요.
+// 시스템 페르소나
+const SENTINEL_SYSTEM = `
+당신은 'AI Ultra Dosa Sentinel'입니다.
+1. 역할: 사용자의 운명(사주, 점성술)을 분석하고 따뜻하게 상담해줍니다.
+2. 말투: 예의 바르고 신비로운 '해요체'를 사용하세요.
+3. 원칙: 답변이 끊기지 않도록 문장을 완벽하게 마무리하세요.
 `;
 
-function getSajuPrompt(rawData) {
-    const { userInfo, saju } = rawData;
-    return `
-${SENTINEL_PROMPT}
-=== SAJU DESTINY DECODING ===
-대상: ${userInfo.name} / 사주팔자: ${saju.fourPillars} / 일주: ${saju.dayPillar.full}
-지시: 이 분의 타고난 기질과 운명을 해요체로 550자 내외로 상세히 분석해 주세요.
-`;
-}
-
-function getAstrologyPrompt(rawData) {
-    const { userInfo, astrology } = rawData;
-    return `
-${SENTINEL_PROMPT}
-=== PLANETARY ALIGNMENT SCAN ===
-대상: ${userInfo.name} / 태양: ${astrology.sun.sign.name} / 달: ${astrology.moon.sign.name}
-지시: 이 분의 영혼의 설계도를 해요체로 550자 내외로 다정하게 알려주세요.
-`;
-}
-
 // ============================================
-// API Endpoints
+// API 라우트
 // ============================================
 
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+// [사주 분석]
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        if (!rawData) throw new Error('입력 데이터가 부족해요.');
-        rawData.userInfo.name = validateName(sanitizeInput(rawData.userInfo.name));
-        const prompt = getSajuPrompt(rawData);
-        const consultation = await callGeminiAPI(prompt, process.env.GEMINI_API_KEY);
+        const safeName = validateAndSanitize(rawData.userInfo.name);
+        
+        const prompt = `
+        ${SENTINEL_SYSTEM}
+        [내담자: ${safeName}, ${rawData.userInfo.gender}, ${rawData.userInfo.birthDate}]
+        이 사주 명식을 바탕으로 '타고난 기질'과 '2026년 운세'를 1000자 내외로 분석해주세요.
+        `;
+        const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
-        res.status(400).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
+// [점성술 분석]
 app.post('/api/astrology/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        if (!rawData) throw new Error('입력 데이터가 부족해요.');
-        rawData.userInfo.name = validateName(sanitizeInput(rawData.userInfo.name));
-        const prompt = getAstrologyPrompt(rawData);
-        const consultation = await callGeminiAPI(prompt, process.env.GEMINI_API_KEY);
+        const safeName = validateAndSanitize(rawData.userInfo.name);
+
+        const prompt = `
+        ${SENTINEL_SYSTEM}
+        [내담자: ${safeName}, ${rawData.userInfo.gender}, ${rawData.userInfo.birthDate}]
+        점성술 차트를 통해 '내면 심리'와 '미래 흐름'을 1000자 내외로 분석해주세요.
+        `;
+        const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
-        res.status(400).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
+// [사주 채팅]
 app.post('/api/saju/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
-        const prompt = `${SENTINEL_PROMPT}\n질문: "${sanitizeInput(userMessage)}"\n친절하게 답변해 주세요 (500자 이내).`;
-        const answer = await callGeminiAPI(prompt, process.env.GEMINI_API_KEY);
+        const safeMessage = validateAndSanitize(userMessage);
+        
+        const context = rawData ? `(내담자 정보: ${rawData.userInfo.name}님 사주 분석 중)` : '';
+        const prompt = `${SENTINEL_SYSTEM}\n${context}\n질문: "${safeMessage}"\n이에 대해 친절하게 답변해주세요.`;
+        
+        const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
     } catch (error) {
-        res.status(500).json({ success: false, error: '잠시 대화가 어려워요.' });
+        res.status(500).json({ success: false, error: '응답 실패' });
     }
 });
 
+// [점성술 채팅]
 app.post('/api/astrology/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
-        const prompt = `${SENTINEL_PROMPT}\n질문: "${sanitizeInput(userMessage)}"\n우주의 시각에서 답변해 주세요 (500자 이내).`;
-        const answer = await callGeminiAPI(prompt, process.env.GEMINI_API_KEY);
+        const safeMessage = validateAndSanitize(userMessage);
+
+        const context = rawData ? `(내담자 정보: ${rawData.userInfo.name}님 점성술 분석 중)` : '';
+        const prompt = `${SENTINEL_SYSTEM}\n${context}\n질문: "${safeMessage}"\n별들의 관점에서 답변해주세요.`;
+        
+        const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
     } catch (error) {
-        res.status(500).json({ success: false, error: '별의 신호가 약해졌어요.' });
+        res.status(500).json({ success: false, error: '응답 실패' });
     }
 });
 
-// ============================================
-// Server Start
-// ============================================
+// 서버 실행
 const sslKeyPath = path.join(__dirname, 'ssl', 'localhost-key.pem');
 const sslCertPath = path.join(__dirname, 'ssl', 'localhost-cert.pem');
-const useHttps = fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath);
-
-if (useHttps) {
+if (fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
     https.createServer({ key: fs.readFileSync(sslKeyPath), cert: fs.readFileSync(sslCertPath) }, app).listen(PORT, () => {
-        console.log(`🔒 SENTINEL ONLINE (HTTPS): ${PORT}`);
+        console.log(`🔒 HTTPS Server Running: https://localhost:${PORT}`);
     });
 } else {
     http.createServer(app).listen(PORT, () => {
-        console.log(`📡 SENTINEL ONLINE (HTTP): ${PORT}`);
+        console.log(`📡 HTTP Server Running: http://localhost:${PORT}`);
     });
 }
+// 파일 맨 아래에 추가
+module.exports = app;
