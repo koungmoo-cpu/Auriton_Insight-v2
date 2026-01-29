@@ -193,4 +193,4 @@ if (fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
     });
 }
 // 파일 맨 아래에 추가
-javascript export default app;
+export default app;
