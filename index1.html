@@ -27,7 +27,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: var(--bg-deep); color: var(--text-main); font-family: var(--font-body); overflow-x: hidden; min-height: 100vh; position: relative; }
 
-        /* 배경 효과 */
+        /* 배경 효과 (보안 경고 없음) */
         .stars {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2;
             background: #000 radial-gradient(2px 2px at 20px 30px, #eee, rgba(0,0,0,0)), radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)), radial-gradient(2px 2px at 50px 160px, #ddd, rgba(0,0,0,0));
@@ -88,15 +88,16 @@
         .option-button { flex: 1; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid #333; color: #aaa; cursor: pointer; font-family: var(--font-tech); }
         .option-button.active { background: rgba(255,255,255,0.1); border-color: var(--accent-gold); color: var(--accent-gold); }
         
+        /* 체크박스 스타일 */
         .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; color: #ccc; font-size: 0.9rem; margin-top: 10px; }
         .checkbox-label input { width: 16px; height: 16px; accent-color: var(--accent-gold); }
-        .form-hint { font-size: 0.8rem; color: #00f2ff; margin-top: 5px; font-family: var(--font-body); }
-        .privacy-hint { font-size: 0.8rem; color: #555; margin-top: 5px; font-family: monospace; }
+        .form-hint { font-size: 0.8rem; color: #555; margin-top: 5px; font-family: monospace; }
 
         .submit-button { width: 100%; padding: 15px; margin-top: 20px; font-family: var(--font-tech); font-weight: bold; cursor: pointer; border: none; transition: 0.3s; }
         .saju-btn { background: var(--primary-purple); color: #fff; }
         .astro-btn { background: var(--primary-cyan); color: #000; }
         .submit-button:hover { filter: brightness(1.2); }
+        .submit-button:disabled { background: #333; color: #555; cursor: not-allowed; }
 
         .back-button { background: none; border: none; color: #666; cursor: pointer; font-family: var(--font-tech); margin-bottom: 20px; }
         .back-button:hover { color: #fff; }
@@ -162,10 +163,12 @@
             <div class="form-container saju-theme">
                 <div class="form-header"><h2 class="form-title">SAJU SEQUENCE</h2></div>
                 <form id="saju-form">
+                    
                     <div class="form-group">
                         <label class="form-label">CODENAME (Name)</label>
                         <input type="text" id="saju-name" class="form-input" placeholder="성함을 입력하세요" required>
                     </div>
+
                     <div class="form-group">
                         <label class="form-label">BIOLOGICAL TYPE</label>
                         <div class="button-group" id="saju-gender-group">
@@ -173,6 +176,7 @@
                             <button type="button" class="option-button" data-value="female">FEMALE</button>
                         </div>
                     </div>
+
                     <div class="form-group">
                         <label class="form-label">CALENDAR SYSTEM</label>
                         <div class="button-group" id="saju-calendar-group">
@@ -180,6 +184,7 @@
                             <button type="button" class="option-button" data-value="lunar">LUNAR (음력)</button>
                         </div>
                     </div>
+
                     <div class="form-group">
                         <label class="form-label">DATE OF ORIGIN</label>
                         <div class="select-group">
@@ -188,6 +193,7 @@
                             <select id="saju-day" class="form-select" required><option value="">DAY</option></select>
                         </div>
                     </div>
+
                     <div class="form-group">
                         <label class="form-label">TIME OF ORIGIN</label>
                         <select id="saju-time" class="form-select" required>
@@ -206,13 +212,15 @@
                             <option value="해시">해시 (21:30 ~ 23:29)</option>
                         </select>
                     </div>
+
                     <div class="form-group">
                         <label class="checkbox-label">
                             <input type="checkbox" id="saju-privacy" required>
                             <span>AGREE TO DATA PROCESSING</span>
                         </label>
-                        <p class="privacy-hint">// Data will be purged immediately after analysis.</p>
+                        <p class="form-hint">// Data will be purged immediately after analysis.</p>
                     </div>
+
                     <button type="submit" class="submit-button saju-btn">ACTIVATE ANALYSIS</button>
                 </form>
             </div>
@@ -225,7 +233,7 @@
                 <form id="astro-form">
                     <div class="form-group">
                         <label class="form-label">CODENAME</label>
-                        <input type="text" id="astro-name" class="form-input" placeholder="성함을 입력하세요" required>
+                        <input type="text" id="astro-name" class="form-input" required>
                     </div>
                     
                     <div class="form-group">
@@ -237,26 +245,9 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">DATE OF ORIGIN</label>
-                        <div class="select-group">
-                            <select id="astro-year" class="form-select" required><option value="">YEAR</option></select>
-                            <select id="astro-month" class="form-select" required><option value="">MONTH</option></select>
-                            <select id="astro-day" class="form-select" required><option value="">DAY</option></select>
-                        </div>
-                        <p class="form-hint">※ 점성술은 '양력(Solar) 생일'을 기준으로 분석합니다.</p>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">TIME OF ORIGIN</label>
-                        <input type="time" id="astro-time" class="form-input" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="astro-privacy" required>
-                            <span>AGREE TO DATA PROCESSING</span>
-                        </label>
-                        <p class="privacy-hint">// Data will be purged immediately after analysis.</p>
+                        <label class="form-label">DATE & TIME</label>
+                        <input type="date" id="astro-date" class="form-input" required>
+                        <input type="time" id="astro-time" class="form-input">
                     </div>
 
                     <button type="submit" class="submit-button astro-btn">ACTIVATE ANALYSIS</button>
@@ -287,9 +278,11 @@
     </footer>
 
     <script>
+        // 전역 변수
         let currentMode = '';
         let currentUserInfo = {};
 
+        // 화면 전환 함수
         function selectMethod(method) {
             currentMode = method;
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
@@ -308,6 +301,7 @@
             document.getElementById('result-screen').classList.add('active');
         }
 
+        // 메시지 추가
         function appendMessage(sender, text) {
             const chatBox = document.getElementById('chat-box');
             const msgDiv = document.createElement('div');
@@ -317,6 +311,7 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
+        // API 호출
         async function callApi(endpoint, data) {
             try {
                 const response = await fetch(endpoint, {
@@ -331,6 +326,7 @@
             }
         }
 
+        // 옵션 버튼 설정 (성별, 양력/음력 등)
         function setupOptionButtons(id) {
             const group = document.getElementById(id);
             if(!group) return;
@@ -341,88 +337,86 @@
             }));
         }
 
-        // 년/월/일 생성 함수 (사주/점성술 모두 적용)
+        // 년, 월, 일 옵션 생성 함수
         function populateDateSelects() {
-            // 사주 및 점성술 년/월/일 ID 목록
-            const targetIds = [
-                { y: 'saju-year', m: 'saju-month', d: 'saju-day' },
-                { y: 'astro-year', m: 'astro-month', d: 'astro-day' }
-            ];
+            const yearSelect = document.getElementById('saju-year');
+            const monthSelect = document.getElementById('saju-month');
+            const daySelect = document.getElementById('saju-day');
+            
+            if(!yearSelect) return;
 
-            targetIds.forEach(target => {
-                const yearSelect = document.getElementById(target.y);
-                const monthSelect = document.getElementById(target.m);
-                const daySelect = document.getElementById(target.d);
-
-                if(yearSelect) {
-                    for (let i = 2026; i >= 1920; i--) {
-                        let opt = document.createElement('option');
-                        opt.value = i; opt.innerHTML = i + "년";
-                        yearSelect.appendChild(opt);
-                    }
-                }
-                if(monthSelect) {
-                    for (let i = 1; i <= 12; i++) {
-                        let opt = document.createElement('option');
-                        opt.value = i; opt.innerHTML = i + "월";
-                        monthSelect.appendChild(opt);
-                    }
-                }
-                if(daySelect) {
-                    for (let i = 1; i <= 31; i++) {
-                        let opt = document.createElement('option');
-                        opt.value = i; opt.innerHTML = i + "일";
-                        daySelect.appendChild(opt);
-                    }
-                }
-            });
+            // 년도 채우기 (1920 ~ 2026)
+            for (let i = 2026; i >= 1920; i--) {
+                let opt = document.createElement('option');
+                opt.value = i;
+                opt.innerHTML = i + "년";
+                yearSelect.appendChild(opt);
+            }
+            // 월 채우기
+            for (let i = 1; i <= 12; i++) {
+                let opt = document.createElement('option');
+                opt.value = i;
+                opt.innerHTML = i + "월";
+                monthSelect.appendChild(opt);
+            }
+            // 일 채우기
+            for (let i = 1; i <= 31; i++) {
+                let opt = document.createElement('option');
+                opt.value = i;
+                opt.innerHTML = i + "일";
+                daySelect.appendChild(opt);
+            }
         }
 
+        // 초기화 및 이벤트 리스너
         document.addEventListener('DOMContentLoaded', () => {
             setupOptionButtons('saju-gender-group');
-            setupOptionButtons('saju-calendar-group');
+            setupOptionButtons('saju-calendar-group'); // 양력/음력
             setupOptionButtons('astro-gender-group');
-            populateDateSelects();
+            populateDateSelects(); // 년월일 생성
 
             // 사주 폼 제출
             document.getElementById('saju-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                if (!document.getElementById('saju-privacy').checked) { alert('개인정보 처리에 동의해주세요.'); return; }
                 
+                // 데이터 수집
                 const name = document.getElementById('saju-name').value;
                 const gender = document.querySelector('#saju-gender-group .active').dataset.value;
                 const calendar = document.querySelector('#saju-calendar-group .active').dataset.value;
+                
                 const year = document.getElementById('saju-year').value;
                 const month = document.getElementById('saju-month').value;
                 const day = document.getElementById('saju-day').value;
                 const time = document.getElementById('saju-time').value;
 
-                currentUserInfo = { name, gender, birthDate: `${year}년 ${month}월 ${day}일 (${calendar}) ${time}` };
+                // 개인정보 동의 체크 확인
+                if (!document.getElementById('saju-privacy').checked) {
+                    alert('개인정보 처리에 동의해주세요.');
+                    return;
+                }
+
+                const fullDate = `${year}년 ${month}월 ${day}일 (${calendar}) ${time}`;
+                currentUserInfo = { name, gender, birthDate: fullDate };
+                
                 showResultScreen();
                 appendMessage('ai', '데이터 처리 중... 사주명조를 세우고 있습니다.');
+                
                 const res = await callApi('/api/saju/consultation', { rawData: { userInfo: currentUserInfo } });
                 appendMessage('ai', res.success ? res.consultation : '오류: ' + res.error);
             });
 
-            // 점성술 폼 제출 (수정됨)
+            // 점성술 폼 제출 (기존 유지)
             document.getElementById('astro-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                // 개인정보 동의 확인
-                if (!document.getElementById('astro-privacy').checked) { alert('개인정보 처리에 동의해주세요.'); return; }
-
                 const name = document.getElementById('astro-name').value;
                 const gender = document.querySelector('#astro-gender-group .active').dataset.value;
-                // 스크롤 값 가져오기
-                const year = document.getElementById('astro-year').value;
-                const month = document.getElementById('astro-month').value;
-                const day = document.getElementById('astro-day').value;
+                const date = document.getElementById('astro-date').value;
                 const time = document.getElementById('astro-time').value || '00:00';
-
-                // 점성술은 무조건 양력
-                currentUserInfo = { name, gender, birthDate: `${year}년 ${month}월 ${day}일 (Solar) ${time}` };
+                currentUserInfo = { name, gender, birthDate: `${date} ${time}` };
                 
                 showResultScreen();
                 appendMessage('ai', '별들의 위치를 계산 중입니다...');
+                
                 const res = await callApi('/api/astrology/consultation', { rawData: { userInfo: currentUserInfo } });
                 appendMessage('ai', res.success ? res.consultation : '오류: ' + res.error);
             });
