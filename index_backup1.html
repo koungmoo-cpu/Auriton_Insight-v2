@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AI Ultra Dosa Sentinel">
+    <meta name="description" content="AI Ultra Dosa Sentinel - 고대의 지혜와 미래 AI의 결합">
     <title>AI Ultra Dosa Sentinel</title>
     
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👁️</text></svg>">
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Noto+Sans+KR:wght@300;400;500;700&family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="style.css">
-    
     <script src="script.js" defer></script>
 </head>
 <body>
@@ -27,13 +28,14 @@
     </header>
     
     <main class="main-container">
+        
         <section id="selection-screen" class="screen active">
             <div class="selection-content">
                 <h2 class="section-title">CHOOSE YOUR DESTINY</h2>
                 <p class="section-desc">운명을 해석할 프로토콜을 선택하십시오</p>
                 
                 <div class="method-grid">
-                    <div class="method-card saju-card" onclick="window.selectMethod('saju')">
+                    <div class="method-card saju-card" onclick="selectMethod('saju')">
                         <div class="card-border"></div>
                         <div class="card-header">
                             <div class="card-icon">🔮</div>
@@ -49,7 +51,7 @@
                         <button class="card-button saju-btn">INITIALIZE <span class="arrow">▶</span></button>
                     </div>
                     
-                    <div class="method-card astro-card" onclick="window.selectMethod('astrology')">
+                    <div class="method-card astro-card" onclick="selectMethod('astrology')">
                         <div class="card-border"></div>
                         <div class="card-header">
                             <div class="card-icon">🌌</div>
@@ -69,7 +71,7 @@
         </section>
         
         <section id="saju-screen" class="screen">
-            <button class="back-button" onclick="window.backToSelection()">◀ ABORT</button>
+            <button class="back-button" onclick="backToSelection()">◀ ABORT</button>
             <div class="form-container saju-theme">
                 <div class="form-header">
                     <h2 class="form-title">SAJU SEQUENCE</h2>
@@ -89,7 +91,9 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">DATE OF ORIGIN</label>
-                        <input type="date" id="saju-date" class="form-input" required>
+                        <div class="select-group">
+                            <input type="date" id="saju-date" class="form-input" required>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label class="form-label">TIME OF ORIGIN</label>
@@ -115,7 +119,7 @@
         </section>
         
         <section id="astrology-screen" class="screen">
-            <button class="back-button" onclick="window.backToSelection()">◀ ABORT</button>
+            <button class="back-button" onclick="backToSelection()">◀ ABORT</button>
             <div class="form-container astro-theme">
                 <div class="form-header">
                     <h2 class="form-title">ASTRO SEQUENCE</h2>
@@ -147,7 +151,7 @@
         </section>
 
         <section id="result-screen" class="screen">
-            <button class="back-button" onclick="window.backToSelection()">◀ RESTART</button>
+            <button class="back-button" onclick="backToSelection()">◀ RESTART</button>
             <div class="hud-interface">
                 <div class="hud-corner top-left"></div>
                 <div class="hud-corner top-right"></div>
@@ -157,7 +161,7 @@
 
                 <div class="result-header">
                     <h2 class="result-title">ANALYSIS COMPLETE</h2>
-                    <button class="new-analysis-button" onclick="window.backToSelection()">NEW SCAN</button>
+                    <button class="new-analysis-button" onclick="backToSelection()">NEW SCAN</button>
                 </div>
 
                 <div id="chat-box" class="chat-messages">

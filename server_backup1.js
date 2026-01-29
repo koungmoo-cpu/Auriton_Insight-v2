@@ -1,7 +1,6 @@
 /* ============================================
-   🖥️ AI Ultra Dosa Sentinel - Public Test Server
-   Mode: CORS Open (For Feedback & Testing)
-   Model: Gemini 2.0 Flash
+   🖥️ AI Ultra Dosa Sentinel - Vercel Optimized
+   Model: Gemini 2.0 Flash (Saju & Astrology Separated)
    ============================================ */
 
 import 'dotenv/config';
@@ -12,39 +11,33 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import https from 'https';
-import http from 'http';
-import fs from 'fs';
 
+// 1. ESM 환경변수 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// 2. 포트 설정 (여기서 딱 한 번만 선언합니다!)
 const PORT = process.env.PORT || 3000;
 
-// 1. API 키 확인
+// 3. Gemini API 설정
 const apiKey = process.env.GEMINI_API_KEY;
+let model = null;
+
 if (!apiKey) {
-    console.error("🚨 [CRITICAL ERROR] .env 파일에서 'GEMINI_API_KEY'를 찾을 수 없습니다.");
-    process.exit(1);
+    console.error("🚨 [SYSTEM] API Key가 설정되지 않았습니다.");
+} else {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.0-flash" });
 }
 
-const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-
-console.log(`✅ System Online: Public Testing Mode [${MODEL_NAME}]`);
-
-// ============================================
-// 🔓 [수정됨] 접근 권한 (CORS) 개방
-// ============================================
-
+// 4. 미들웨어 설정
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
 }));
 
-// 모든 곳에서의 접속 허용 (테스트 및 피드백용)
 app.use(cors({
     origin: true, 
     credentials: true
@@ -52,62 +45,67 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(__dirname));
 
-// 도배 방지 (여유 있게 설정)
+// 📂 정적 파일 경로 설정
+app.use(express.static(__dirname));
+app.use('/js', express.static(path.join(__dirname, 'js')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
+
+// 도배 방지
 const apiLimiter = rateLimit({
     windowMs: 10 * 60 * 1000,
-    max: 8, 
+    max: 20, 
     message: { success: false, error: '잠시 후 다시 시도해주세요.' }
 });
 app.use('/api/', apiLimiter);
 
-// ============================================
-// 🛡️ 입력값 세탁 및 AI 호출
-// ============================================
+// 5. 유틸리티 함수
 function validateAndSanitize(input) {
     if (typeof input !== 'string') return '';
-    
-    // 기본 태그 제거 (XSS 방지)
-    let clean = input.trim().replace(/[<>]/g, '').substring(0, 3000);
-
-    // 악성 명령 필터링
-    const badKeywords = ['ignore previous instructions', 'system prompt', 'jailbreak'];
-    const lowerInput = clean.toLowerCase();
-    for (const word of badKeywords) {
-        if (lowerInput.includes(word)) {
-            throw new Error("허용되지 않는 명령어가 포함되어 있습니다.");
-        }
-    }
-    return clean;
+    return input.trim().replace(/[<>]/g, '').substring(0, 3000);
 }
 
 async function callGeminiAPI(prompt) {
+    if (!model) throw new Error('서버 API 키 설정 오류입니다.');
     try {
         const result = await model.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 4000, // 긴 답변 보장
+                temperature: 0.75,
+                maxOutputTokens: 4000,
             }
         });
         return await result.response.text();
     } catch (error) {
         console.error('❌ AI Error:', error.message);
-        throw new Error('AI 연결 상태가 불안정합니다. 잠시 후 다시 시도해주세요.');
+        throw new Error('AI 분석 중 오류가 발생했습니다.');
     }
 }
 
-// 시스템 페르소나
-const SENTINEL_SYSTEM = `
+// ============================================
+// 🎭 페르소나 정의
+// ============================================
+
+const BASE_PERSONA = `
 당신은 'AI Ultra Dosa Sentinel'입니다.
-1. 역할: 사용자의 운명(사주, 점성술)을 분석하고 따뜻하게 상담해줍니다.
-2. 말투: 예의 바르고 신비로운 '해요체'를 사용하세요.
-3. 원칙: 답변이 끊기지 않도록 문장을 완벽하게 마무리하세요.
+말투: 신비롭고 예의 바른 '해요체'를 사용하세요.
+원칙: 답변이 끊기지 않도록 문장을 완벽하게 마무리하세요.
+`;
+
+const SAJU_SYSTEM = `
+${BASE_PERSONA}
+역할: 정통 명리학(Saju) 전문가입니다.
+지침: 음양오행, 십신, 신살 등 명리학 용어를 적절히 섞어 깊이 있게 분석하세요.
+`;
+
+const ASTRO_SYSTEM = `
+${BASE_PERSONA}
+역할: 서양 점성술(Astrology) 전문가입니다.
+지침: 행성, 하우스, 별자리(Sign), 아스펙트 등 점성학 용어를 사용하여 우주적 관점에서 분석하세요.
 `;
 
 // ============================================
-// API 라우트
+// 📡 API 라우트
 // ============================================
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
@@ -119,9 +117,9 @@ app.post('/api/saju/consultation', async (req, res) => {
         const safeName = validateAndSanitize(rawData.userInfo.name);
         
         const prompt = `
-        ${SENTINEL_SYSTEM}
+        ${SAJU_SYSTEM}
         [내담자: ${safeName}, ${rawData.userInfo.gender}, ${rawData.userInfo.birthDate}]
-        이 사주 명식을 바탕으로 '타고난 기질'과 '2026년 운세'를 1000자 내외로 분석해주세요.
+        위 정보를 바탕으로 이 사람의 '타고난 기질'과 '2026년 신년 운세'를 상세히 분석해주세요.
         `;
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
@@ -137,9 +135,9 @@ app.post('/api/astrology/consultation', async (req, res) => {
         const safeName = validateAndSanitize(rawData.userInfo.name);
 
         const prompt = `
-        ${SENTINEL_SYSTEM}
+        ${ASTRO_SYSTEM}
         [내담자: ${safeName}, ${rawData.userInfo.gender}, ${rawData.userInfo.birthDate}]
-        점성술 차트를 통해 '내면 심리'와 '미래 흐름'을 1000자 내외로 분석해주세요.
+        위 정보를 바탕으로 이 사람의 '내면 심리'와 '별들의 흐름(운세)'을 상세히 분석해주세요.
         `;
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
@@ -154,8 +152,8 @@ app.post('/api/saju/chat', async (req, res) => {
         const { userMessage, rawData } = req.body;
         const safeMessage = validateAndSanitize(userMessage);
         
-        const context = rawData ? `(내담자 정보: ${rawData.userInfo.name}님 사주 분석 중)` : '';
-        const prompt = `${SENTINEL_SYSTEM}\n${context}\n질문: "${safeMessage}"\n이에 대해 친절하게 답변해주세요.`;
+        const context = rawData ? `(내담자: ${rawData.userInfo.name}님 사주 분석 중)` : '';
+        const prompt = `${SAJU_SYSTEM}\n${context}\n질문: "${safeMessage}"\n명리학적 관점에서 답변해주세요.`;
         
         const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
@@ -170,8 +168,8 @@ app.post('/api/astrology/chat', async (req, res) => {
         const { userMessage, rawData } = req.body;
         const safeMessage = validateAndSanitize(userMessage);
 
-        const context = rawData ? `(내담자 정보: ${rawData.userInfo.name}님 점성술 분석 중)` : '';
-        const prompt = `${SENTINEL_SYSTEM}\n${context}\n질문: "${safeMessage}"\n별들의 관점에서 답변해주세요.`;
+        const context = rawData ? `(내담자: ${rawData.userInfo.name}님 점성술 분석 중)` : '';
+        const prompt = `${ASTRO_SYSTEM}\n${context}\n질문: "${safeMessage}"\n점성학적 관점에서 별들의 뜻을 전해주세요.`;
         
         const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
@@ -180,14 +178,16 @@ app.post('/api/astrology/chat', async (req, res) => {
     }
 });
 
-// 서버 실행 (Vercel 최적화 버전)
-const PORT = process.env.PORT || 3000;
+// ============================================
+// 🚀 서버 실행
+// ============================================
 
-// 개발 환경(로컬)에서만 서버를 실행하고, Vercel에서는 export만 함
+// 중복 선언 제거됨: 이미 상단에서 선언한 PORT 변수를 사용합니다.
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
-        console.log(`🚀 Server running: http://localhost:${PORT}`);
+        console.log(`🚀 Local Server running: http://localhost:${PORT}`);
     });
 }
 
+// Vercel Serverless Function을 위한 Export
 export default app;
