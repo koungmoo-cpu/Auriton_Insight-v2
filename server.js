@@ -12,14 +12,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// 1. ESM 환경변수 설정 (파일 경로 인식용)
+// 1. ESM 환경변수 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// 2. 포트 설정 (여기서 딱 한 번만 선언합니다!)
 const PORT = process.env.PORT || 3000;
 
-// 2. Gemini API 설정
+// 3. Gemini API 설정
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
 
@@ -30,7 +32,7 @@ if (!apiKey) {
     model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.0-flash" });
 }
 
-// 3. 미들웨어 설정
+// 4. 미들웨어 설정
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
@@ -44,8 +46,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 📂 [핵심] 정적 파일 경로 설정 (Vercel 배포 시 필수)
-// 루트, js 폴더, images 폴더를 명시적으로 허용합니다.
+// 📂 정적 파일 경로 설정
 app.use(express.static(__dirname));
 app.use('/js', express.static(path.join(__dirname, 'js')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
@@ -58,7 +59,7 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// 4. 유틸리티 함수
+// 5. 유틸리티 함수
 function validateAndSanitize(input) {
     if (typeof input !== 'string') return '';
     return input.trim().replace(/[<>]/g, '').substring(0, 3000);
@@ -82,24 +83,21 @@ async function callGeminiAPI(prompt) {
 }
 
 // ============================================
-// 🎭 페르소나 정의 (사주/점성술 분리)
+// 🎭 페르소나 정의
 // ============================================
 
-// 공통 기본 성격
 const BASE_PERSONA = `
 당신은 'AI Ultra Dosa Sentinel'입니다.
 말투: 신비롭고 예의 바른 '해요체'를 사용하세요.
 원칙: 답변이 끊기지 않도록 문장을 완벽하게 마무리하세요.
 `;
 
-// [사주 전용 페르소나]
 const SAJU_SYSTEM = `
 ${BASE_PERSONA}
 역할: 정통 명리학(Saju) 전문가입니다.
 지침: 음양오행, 십신, 신살 등 명리학 용어를 적절히 섞어 깊이 있게 분석하세요.
 `;
 
-// [점성술 전용 페르소나]
 const ASTRO_SYSTEM = `
 ${BASE_PERSONA}
 역할: 서양 점성술(Astrology) 전문가입니다.
@@ -112,7 +110,7 @@ ${BASE_PERSONA}
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// 1. 사주 분석 요청
+// [사주 분석]
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
@@ -130,7 +128,7 @@ app.post('/api/saju/consultation', async (req, res) => {
     }
 });
 
-// 2. 점성술 분석 요청
+// [점성술 분석]
 app.post('/api/astrology/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
@@ -148,7 +146,7 @@ app.post('/api/astrology/consultation', async (req, res) => {
     }
 });
 
-// 3. 사주 채팅
+// [사주 채팅]
 app.post('/api/saju/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
@@ -164,7 +162,7 @@ app.post('/api/saju/chat', async (req, res) => {
     }
 });
 
-// 4. 점성술 채팅
+// [점성술 채팅]
 app.post('/api/astrology/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
@@ -181,12 +179,10 @@ app.post('/api/astrology/chat', async (req, res) => {
 });
 
 // ============================================
-// 🚀 서버 실행 (Vercel 호환)
+// 🚀 서버 실행
 // ============================================
 
-const PORT = process.env.PORT || 3000;
-
-// 로컬 개발 환경에서만 listen 실행
+// 중복 선언 제거됨: 이미 상단에서 선언한 PORT 변수를 사용합니다.
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
         console.log(`🚀 Local Server running: http://localhost:${PORT}`);
