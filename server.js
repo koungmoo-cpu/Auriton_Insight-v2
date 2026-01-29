@@ -180,17 +180,14 @@ app.post('/api/astrology/chat', async (req, res) => {
     }
 });
 
-// 서버 실행
-const sslKeyPath = path.join(__dirname, 'ssl', 'localhost-key.pem');
-const sslCertPath = path.join(__dirname, 'ssl', 'localhost-cert.pem');
-if (fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
-    https.createServer({ key: fs.readFileSync(sslKeyPath), cert: fs.readFileSync(sslCertPath) }, app).listen(PORT, () => {
-        console.log(`🔒 HTTPS Server Running: https://localhost:${PORT}`);
-    });
-} else {
-    http.createServer(app).listen(PORT, () => {
-        console.log(`📡 HTTP Server Running: http://localhost:${PORT}`);
+// 서버 실행 (Vercel 최적화 버전)
+const PORT = process.env.PORT || 3000;
+
+// 개발 환경(로컬)에서만 서버를 실행하고, Vercel에서는 export만 함
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`🚀 Server running: http://localhost:${PORT}`);
     });
 }
-// 파일 맨 아래에 추가
+
 export default app;
