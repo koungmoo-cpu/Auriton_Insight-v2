@@ -75,31 +75,29 @@ const BASE_INSTRUCTION = `
 function getSajuPrompt(rawData) {
     const { userInfo } = rawData;
     
-    // 날짜 및 시간 파싱 (YYYY-MM-DD 형식 가정)
-    const [year, month, day] = userInfo.birthDate.split('-').map(Number);
-    const [hour, minute] = (userInfo.birthTime || "00:00").split(':').map(Number);
+    // 안전한 날짜 추출 (문자열에서 숫자만 골라냄)
+    const dateParts = userInfo.birthDate.match(/\d+/g); 
+    if (!dateParts || dateParts.length < 3) {
+        throw new Error("날짜 형식이 올바르지 않습니다.");
+    }
+
+    const year = parseInt(dateParts[0]);
+    const month = parseInt(dateParts[1]);
+    const day = parseInt(dateParts[2]);
+    // 시간 정보가 있으면 가져오고, 없으면 0으로 설정
+    const hour = dateParts[3] ? parseInt(dateParts[3]) : 0;
+    const minute = dateParts[4] ? parseInt(dateParts[4]) : 0;
 
     let sajuText = "";
-    let eightChar = null;
-
     try {
+        let eightChar;
         if (userInfo.calendarType === '음력') {
-            // 음력 계산
-            const lunar = Lunar.fromYmdHms(year, month, day, hour, minute, 0);
-            eightChar = lunar.getEightChar();
+            eightChar = Lunar.fromYmdHms(year, month, day, hour, minute, 0).getEightChar();
         } else {
-            // 양력 계산
-            const solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
-            eightChar = solar.getLunar().getEightChar();
+            eightChar = Solar.fromYmdHms(year, month, day, hour, minute, 0).getLunar().getEightChar();
         }
-
-        // 한글 명식 생성 (예: 갑자년 을축월 병인일 정묘시)
-        sajuText = `${eightChar.getYearGan()}${eightChar.getYearZhi()}년 ` +
-                   `${eightChar.getMonthGan()}${eightChar.getMonthZhi()}월 ` +
-                   `${eightChar.getDayGan()}${eightChar.getDayZhi()}일 ` +
-                   `${eightChar.getHourGan()}${eightChar.getHourZhi()}시`;
+        sajuText = `${eightChar.getYearGan()}${eightChar.getYearZhi()}년 ${eightChar.getMonthGan()}${eightChar.getMonthZhi()}월 ${eightChar.getDayGan()}${eightChar.getDayZhi()}일 ${eightChar.getHourGan()}${eightChar.getHourZhi()}시`;
     } catch (e) {
-        console.error("Saju Calculation Error:", e);
         sajuText = "사주 명식을 계산하는 중 오류가 발생했습니다.";
     }
 
