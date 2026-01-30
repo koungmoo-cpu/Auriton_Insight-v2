@@ -1,6 +1,6 @@
 /* ============================================
    ⭐ AI Ultra Dosa Sentinel - Astro Module
-   Updated: Added Location Support & Date Padding
+   Updated: Scroll Time Input
    ============================================ */
    console.log('[SYSTEM] Astro Module Loading...');
 
@@ -42,26 +42,21 @@
        const year = document.getElementById('astro-year').value;
        const month = document.getElementById('astro-month').value;
        const day = document.getElementById('astro-day').value;
-       const timeInput = document.getElementById('astro-time').value;
-       const locationInput = window.sanitizeInput(document.getElementById('astro-location').value); // 위치 값 수집
+       const timeInput = document.getElementById('astro-time').value; // 스크롤 값
        
-       if (!name || !window.currentGender || !year || !month || !day || !timeInput || !locationInput) {
+       if (!name || !window.currentGender || !year || !month || !day || !timeInput) {
            alert('필수 정보를 모두 입력해주세요.');
            return;
        }
    
-       // 날짜 포맷 최적화 (1 -> 01)
-       const formattedMonth = month.toString().padStart(2, '0');
-       const formattedDay = day.toString().padStart(2, '0');
-
        const analysisData = {
            method: 'astrology',
            userInfo: {
                name,
                gender: window.currentGender,
-               birthDate: `${year}-${formattedMonth}-${formattedDay}`,
+               birthDate: `${year}-${month}-${day}`,
                birthTime: timeInput,
-               location: locationInput // 수집된 위치 정보 전송
+               location: 'Unknown'
            }
        };
        
