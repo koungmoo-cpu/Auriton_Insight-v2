@@ -1,8 +1,10 @@
 /* ============================================
    🔮 AI Ultra Dosa Sentinel - Saju Module
+   Updated: Calendar Type Support & Logic Integration
    ============================================ */
    console.log('[SYSTEM] Saju Module Loading...');
 
+   // 기본값: 양력
    window.sajuCalendarType = 'solar';
    
    window.initializeSajuForm = function() {
@@ -12,11 +14,12 @@
        window.populateYearOptions('saju-year');
        window.populateMonthOptions('saju-month');
        window.populateDayOptions('saju-day');
+       window.populateHourOptions('saju-hour'); // 시간 옵션 추가
        
        // Gender Button Setup
        window.setupGenderButtons('saju-form');
        
-       // Calendar Type Toggle
+       // Calendar Type Toggle (양력/음력 전환)
        setupCalendarToggle();
        
        // Date Change Event Listeners
@@ -68,6 +71,13 @@
            window.populateDayOptions('saju-day', lastDay);
        }
    }
+
+   // [추가됨] 간단한 간지 계산 헬퍼 함수 (업데이트 소스 반영)
+   function calculateManifestation(y, m, d, t) {
+       const gan = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계'];
+       const zhi = ['자', '축', '인', '묘', '진', '사', '오', '미', '신', '유', '술', '해'];
+       return `${gan[y%10]} ${zhi[y%12]}년... (약식)`; 
+   }
    
    async function handleSajuSubmit(e) {
        e.preventDefault();
@@ -81,6 +91,9 @@
            alert('필수 정보를 모두 입력해주세요.');
            return;
        }
+
+       // [추가됨] 간지 계산 실행
+       const fourPillars = calculateManifestation(year, month, day, time);
    
        const analysisData = {
            method: 'saju',
@@ -89,7 +102,13 @@
                gender: window.currentGender,
                birthDate: `${year}-${month}-${day}`,
                birthTime: time,
-               calendarType: window.sajuCalendarType
+               // [핵심 변경] 서버가 이해할 수 있도록 '양력'/'음력' 한글로 변환하여 전송
+               calendarType: window.sajuCalendarType === 'solar' ? '양력' : '음력'
+           },
+           // [추가됨] 사주 상세 데이터 구조 포함
+           saju: {
+               fourPillars: fourPillars,
+               dayPillar: { full: fourPillars.split(' ')[2] || '정보 없음' }
            }
        };
        
