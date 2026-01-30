@@ -41,7 +41,7 @@ app.use(express.static(__dirname));
 // Rate Limiting
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 50,
+    max: 10,
     message: { success: false, error: '⚠️ SYSTEM OVERHEAT: 잠시 후 다시 시도하십시오.' }
 });
 app.use('/api/', apiLimiter);
@@ -56,7 +56,7 @@ let model = null;
 if (apiKey && apiKey !== 'PLACEHOLDER_API_KEY') {
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     } catch (initError) {
         console.error("Gemini Model Init Failed:", initError);
     }
