@@ -129,7 +129,7 @@ ${BASE_INSTRUCTION}
    - 현재 별들의 배치가 이 사람에게 주는 단 하나의 강렬한 메시지를 던지세요.
 
 * 톤앤매너: 신비롭지만 뼈를 때리는 통찰력.
-* 분량: 1000자 내외의 에세이 형식.
+* 분량: 1200자 내외의 에세이 형식.
 `;
 }
 
@@ -162,18 +162,7 @@ app.post('/api/astrology/consultation', async (req, res) => {
 app.post('/api/saju/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
-        const prompt = `
-${BASE_INSTRUCTION}
-[상황: 사주 상담 채팅]
-사용자: ${rawData.userInfo.name}
-질문: "${userMessage}"
-
-🚨 **작성 지침:**
-1. 질문에 대해 명쾌한 결론을 먼저 말하세요.
-2. 그 이유를 사주적 관점(오행의 흐름 등)에서 사용자가 이해하기 쉽게 풀어서 설명하세요.
-3. 실생활에 적용할 수 있는 팁을 하나 곁들이세요.
-4. **분량**: 약 800자 내외 (너무 짧지도, 너무 길지도 않게 적절한 깊이 유지).
-`;
+        const prompt = `${BASE_INSTRUCTION}\n상황: 사주 분석 중 추가 질문\n사용자 이름: ${rawData.userInfo.name}\n질문: "${userMessage}"\n답변 가이드: 짧고 굵게, 명쾌한 해답을 제시하세요.`;
         const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
     } catch (e) { res.status(500).json({ success: false, error: 'Chat Error' }); }
@@ -182,25 +171,14 @@ ${BASE_INSTRUCTION}
 app.post('/api/astrology/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
-        const prompt = `
-${BASE_INSTRUCTION}
-[상황: 점성학 상담 채팅]
-사용자: ${rawData.userInfo.name}
-질문: "${userMessage}"
-
-🚨 **작성 지침:**
-1. 질문에 대해 별들의 배치를 근거로 통찰력 있는 답변을 주세요.
-2. 단답형 금지. "왜 그런지"에 대한 스토리텔링을 포함하세요.
-3. 사용자가 용기를 얻거나 주의할 수 있는 구체적인 조언을 주세요.
-4. **분량**: 약 800자 내외 (읽기 편하면서도 충분히 깊이 있는 분량).
-`;
+        const prompt = `${BASE_INSTRUCTION}\n상황: 점성학 분석 중 추가 질문\n사용자 이름: ${rawData.userInfo.name}\n질문: "${userMessage}"\n답변 가이드: 우주의 관점에서 통찰력 있는 한 마디를 던지세요.`;
         const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
     } catch (e) { res.status(500).json({ success: false, error: 'Chat Error' }); }
 });
 
 if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => console.log(`🚀 Server running: http://localhost:${PORT}`));
+    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 }
 
 export default app;
