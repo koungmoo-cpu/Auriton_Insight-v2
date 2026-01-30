@@ -352,25 +352,25 @@
             populateDateSelects();
 
             // [사주 폼 제출]
-            document.getElementById('saju-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                if (!document.getElementById('saju-privacy').checked) { alert('개인정보 동의 필요'); return; }
-                const name = document.getElementById('saju-name').value;
-                const gender = document.querySelector('#saju-gender-group .active').dataset.value;
-                const y = parseInt(document.getElementById('saju-year').value);
-                const m = parseInt(document.getElementById('saju-month').value);
-                const d = parseInt(document.getElementById('saju-day').value);
-                const time = document.getElementById('saju-time').value;
+    document.getElementById('saju-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!document.getElementById('saju-privacy').checked) { alert('개인정보 동의 필요'); return; }
+    
+        const name = document.getElementById('saju-name').value;
+        const gender = document.querySelector('#saju-gender-group .active').dataset.value;
+        // ⭐ [핵심 추가] 음력/양력 선택값 가져오기
+        const calendarType = document.querySelector('#saju-calendar-group .active').dataset.value === 'lunar' ? '음력' : '양력';
+        const y = parseInt(document.getElementById('saju-year').value);
+        const m = parseInt(document.getElementById('saju-month').value);
+        const d = parseInt(document.getElementById('saju-day').value);
+        const time = document.getElementById('saju-time').value;
 
-                currentUserInfo = { name, gender, birthDate: `${y}-${m}-${d}`, birthTime: time };
-                const sajuResult = calculateSaju(y, m, d, time);
-                currentRawData = { userInfo: currentUserInfo, saju: sajuResult };
-
-                showResultScreen();
-                appendMessage('ai', '데이터 처리 중... 사주명조를 분석하고 있습니다.');
-                const res = await callApi('/api/saju/consultation', { rawData: currentRawData });
-                appendMessage('ai', res.success ? res.consultation : '오류: ' + res.error);
-            });
+    showResultScreen();
+    appendMessage('ai', `데이터 분석 중... [${calendarType}] ${y}년 ${m}월 ${d}일 ${time} 정보를 연동합니다.`);
+    
+    const res = await callApi('/api/saju/consultation', { rawData: { userInfo: currentUserInfo } });
+    appendMessage('ai', res.success ? res.consultation : '오류가 발생했습니다: ' + res.error);
+});
 
             // [점성술 폼 제출]
             document.getElementById('astro-form').addEventListener('submit', async (e) => {
