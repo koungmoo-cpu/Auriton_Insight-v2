@@ -390,7 +390,6 @@
     const res = await callApi('/api/saju/consultation', { rawData: { userInfo: currentUserInfo } });
     appendMessage('ai', res.success ? res.consultation : '오류 발생: ' + res.error);
 });
-</script>
             //[점성술 폼 제출]
             document.getElementById('astro-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
