@@ -4,6 +4,7 @@
    ============================================ */
 
 import 'dotenv/config';
+import { Solar, Lunar } from 'lunar-javascript';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -70,31 +71,59 @@ const BASE_INSTRUCTION = `
 직설적이고, 통찰력 있게, 사용자의 내면을 꿰뚫어 보는 듯한 톤으로 말하세요.
 `;
 
-// 🔮 사주 프롬프트 (해석 위주)
+// 🔮 사주 프롬프트 (만세력 라이브러리 적용 및 사주단지 출력 강화)
 function getSajuPrompt(rawData) {
     const { userInfo } = rawData;
-    const calendar = userInfo.calendarType || "양력";
     
+    // 날짜 및 시간 파싱 (YYYY-MM-DD 형식 가정)
+    const [year, month, day] = userInfo.birthDate.split('-').map(Number);
+    const [hour, minute] = (userInfo.birthTime || "00:00").split(':').map(Number);
+
+    let sajuText = "";
+    let eightChar = null;
+
+    try {
+        if (userInfo.calendarType === '음력') {
+            // 음력 계산
+            const lunar = Lunar.fromYmdHms(year, month, day, hour, minute, 0);
+            eightChar = lunar.getEightChar();
+        } else {
+            // 양력 계산
+            const solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
+            eightChar = solar.getLunar().getEightChar();
+        }
+
+        // 한글 명식 생성 (예: 갑자년 을축월 병인일 정묘시)
+        sajuText = `${eightChar.getYearGan()}${eightChar.getYearZhi()}년 ` +
+                   `${eightChar.getMonthGan()}${eightChar.getMonthZhi()}월 ` +
+                   `${eightChar.getDayGan()}${eightChar.getDayZhi()}일 ` +
+                   `${eightChar.getHourGan()}${eightChar.getHourZhi()}시`;
+    } catch (e) {
+        console.error("Saju Calculation Error:", e);
+        sajuText = "사주 명식을 계산하는 중 오류가 발생했습니다.";
+    }
+
     return `
 ${BASE_INSTRUCTION}
 
-[분석 대상]
+[분석 데이터]
 - 이름: ${userInfo.name} (${userInfo.gender})
-- 생년월일: ${userInfo.birthDate} ${userInfo.birthTime} (${calendar} 기준)
+- 입력 정보: ${userInfo.birthDate} ${userInfo.birthTime} (${userInfo.calendarType || "양력"})
+- **확정 사주 명식: ${sajuText}**
 
 [임무: 사주 명식 기반 운명 독해]
-위 생년월일을 바탕으로 정확한 사주(네 개의 기둥)를 계산하고 다음을 분석하세요.
+**🚨 중요: 반드시 답변의 맨 첫 줄에 "사주 명식: ${sajuText}"를 한글로 출력한 후 해설을 시작하세요.**
 
 1. **핵심 본성 (일간 분석)**:
-   - 오행의 이론을 설명하지 말고, 이 사람이 "어떤 기질을 타고났는지" 비유를 들어 설명하세요. (예: "당신은 한겨울의 촛불처럼...")
+   - 명식의 주인공인 일간의 기운을 중심으로, 이 사람이 어떤 기질을 타고났는지 신비로운 비유를 들어 설명하세요.
    
-2. **현재의 에너지 흐름**:
-   - 사주 원국에서 가장 강한 기운과 부족한 기운을 찾아내어, 그것이 이 사람의 성격과 행동에 미치는 영향을 분석하세요.
+2. **에너지의 균형**:
+   - 명식에서 가장 강한 기운과 부족한 기운이 삶의 태도나 선택에 어떤 영향을 미치는지 꿰뚫어 보세요.
 
-3. **실질적 조언 (개운법)**:
-   - "물을 가까이 하라" 같은 추상적인 말 대신, 현대적이고 구체적인 행동 지침을 주세요. (예: "검은색 옷을 입거나 밤에 사색하는 시간을 가지세요.")
+3. **현대적 개운법 (실질적 조언)**:
+   - 구체적인 색상, 시간대, 혹은 마음가짐 등 일상에서 바로 실천할 수 있는 팁을 제안하세요.
 
-* 분량: 1000자 내외로 풍부하게 작성하되, 지루한 이론 설명은 모두 빼세요.
+* 분량: 1000자 내외의 깊이 있는 에세이 형식.
 `;
 }
 
@@ -162,41 +191,48 @@ app.post('/api/astrology/consultation', async (req, res) => {
 app.post('/api/saju/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
+        const { userInfo } = rawData;
+
+        // 1. 채팅 시에도 정확한 사주 명식을 다시 계산
+        const [year, month, day] = userInfo.birthDate.split('-').map(Number);
+        const [hour, minute] = (userInfo.birthTime || "00:00").split(':').map(Number);
+
+        let sajuText = "";
+        try {
+            if (userInfo.calendarType === '음력') {
+                const lunar = Lunar.fromYmdHms(year, month, day, hour, minute, 0);
+                const eightChar = lunar.getEightChar();
+                sajuText = `${eightChar.getYearGan()}${eightChar.getYearZhi()}년 ${eightChar.getMonthGan()}${eightChar.getMonthZhi()}월 ${eightChar.getDayGan()}${eightChar.getDayZhi()}일 ${eightChar.getHourGan()}${eightChar.getHourZhi()}시`;
+            } else {
+                const solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
+                const eightChar = solar.getLunar().getEightChar();
+                sajuText = `${eightChar.getYearGan()}${eightChar.getYearZhi()}년 ${eightChar.getMonthGan()}${eightChar.getMonthZhi()}월 ${eightChar.getDayGan()}${eightChar.getDayZhi()}일 ${eightChar.getHourGan()}${eightChar.getHourZhi()}시`;
+            }
+        } catch (e) {
+            sajuText = "사주 명식 정보 확인 불가";
+        }
+
+        // 2. AI에게 전달할 프롬프트 구성 (사주 정보 포함)
         const prompt = `
 ${BASE_INSTRUCTION}
-[상황: 사주 상담 채팅]
-사용자: ${rawData.userInfo.name}
-질문: "${userMessage}"
+[상황: 사주 상세 상담 채팅]
+- 사용자: ${userInfo.name} (${userInfo.gender})
+- 확정된 사주 명식: ${sajuText}
+- 사용자의 추가 질문: "${userMessage}"
 
 🚨 **작성 지침:**
-1. 질문에 대해 명쾌한 결론을 먼저 말하세요.
-2. 그 이유를 사주적 관점(오행의 흐름 등)에서 사용자가 이해하기 쉽게 풀어서 설명하세요.
-3. 실생활에 적용할 수 있는 팁을 하나 곁들이세요.
-4. **분량**: 약 800자 내외 (너무 짧지도, 너무 길지도 않게 적절한 깊이 유지).
+1. 위 '확정된 사주 명식'(${sajuText})을 모든 답변의 근거로 삼으세요. 다른 명식으로 해석해서는 안 됩니다.
+2. 질문에 대해 명쾌한 결론을 먼저 말하고, 그 이유를 사주적 관점(오행의 흐름, 일간의 특징 등)에서 풀어서 설명하세요.
+3. 실생활에 적용할 수 있는 구체적인 팁을 하나 포함하세요.
+4. **분량**: 약 800자 내외로 깊이 있는 통찰을 전달하세요.
 `;
+
         const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
-    } catch (e) { res.status(500).json({ success: false, error: 'Chat Error' }); }
-});
-
-app.post('/api/astrology/chat', async (req, res) => {
-    try {
-        const { userMessage, rawData } = req.body;
-        const prompt = `
-${BASE_INSTRUCTION}
-[상황: 점성학 상담 채팅]
-사용자: ${rawData.userInfo.name}
-질문: "${userMessage}"
-
-🚨 **작성 지침:**
-1. 질문에 대해 별들의 배치를 근거로 통찰력 있는 답변을 주세요.
-2. 단답형 금지. "왜 그런지"에 대한 스토리텔링을 포함하세요.
-3. 사용자가 용기를 얻거나 주의할 수 있는 구체적인 조언을 주세요.
-4. **분량**: 약 800자 내외 (읽기 편하면서도 충분히 깊이 있는 분량).
-`;
-        const answer = await callGeminiAPI(prompt);
-        res.json({ success: true, answer });
-    } catch (e) { res.status(500).json({ success: false, error: 'Chat Error' }); }
+    } catch (e) {
+        console.error("Chat Error:", e);
+        res.status(500).json({ success: false, error: 'Chat Error' });
+    }
 });
 
 if (process.env.NODE_ENV !== 'production') {
