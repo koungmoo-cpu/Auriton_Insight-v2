@@ -245,12 +245,50 @@
     <footer class="site-footer" style="text-align: center; padding: 40px; color: #444; font-family: var(--font-tech); font-size: 0.8rem;">© 2026 AI ULTRA DOSA SENTINEL.</footer>
 
     <script>
-        // === 1. UI 관리 상태 변수 ===
+        // === 1. 계산 로직 (사주/점성술 모듈) ===
+        const HEAVENLY_STEMS = ['갑','을','병','정','무','기','경','신','임','계'];
+        const EARTHLY_BRANCHES = ['자','축','인','묘','진','사','오','미','신','유','술','해'];
+        const FIVE_ELEMENTS = {
+            '갑':'목','을':'목','병':'화','정':'화','무':'토','기':'토','경':'금','신':'금','임':'수','계':'수',
+            '인':'목','묘':'목','사':'화','오':'화','진':'토','술':'토','축':'토','미':'토','신':'금','유':'금','자':'수','해':'수'
+        };
+        const ZODIAC = ['양','황소','쌍둥이','게','사자','처녀','천칭','전갈','사수','염소','물병','물고기'];
+
+        function getPillar(idx, offset) {
+            return {
+                stem: HEAVENLY_STEMS[(idx + offset) % 10],
+                branch: EARTHLY_BRANCHES[(idx + offset) % 12],
+                full: HEAVENLY_STEMS[(idx + offset) % 10] + EARTHLY_BRANCHES[(idx + offset) % 12]
+            };
+        }
+
+        function calculateSaju(y, m, d, h) {
+            const yearP = getPillar(y - 4, 0);
+            const monthP = getPillar((y - 4) * 12 + m, 2);
+            const dayP = getPillar((y * 365 + d), 4);
+            const hIdx = (['자','축','인','묘','진','사','오','미','신','유','술','해'].indexOf(h));
+            const hourP = hIdx >= 0 ? getPillar(hIdx, 0) : {full:'시간모름'};
+            const els = {'목':0,'화':0,'토':0,'금':0,'수':0};
+            [yearP, monthP, dayP].forEach(p => {
+                if(p.stem) els[FIVE_ELEMENTS[p.stem]]++;
+                if(p.branch) els[FIVE_ELEMENTS[p.branch]]++;
+            });
+            return { fourPillars: `${yearP.full} ${monthP.full} ${dayP.full} ${hourP.full}`, dayPillar: dayP, elements: els };
+        }
+
+        function calculateAstrology(y, m, d) {
+            const sunIdx = (m - 3 + 12) % 12;
+            const moonIdx = (d % 27) / 2.5; 
+            const ascIdx = (sunIdx + 2) % 12; 
+            const getSign = (idx) => ({ name: ZODIAC[Math.floor(idx) % 12] + '자리' });
+            return { sun: { sign: getSign(sunIdx) }, moon: { sign: getSign(moonIdx) }, ascendant: { sign: getSign(ascIdx) } };
+        }
+
+        // === 2. 메인 UI 로직 ===
         let currentMode = '';
         let currentUserInfo = {};
         let currentRawData = {};
 
-        // === 2. 화면 전환 로직 ===
         function selectMethod(method) {
             currentMode = method;
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
@@ -278,7 +316,6 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // === 3. API 통신 로직 ===
         async function callApi(endpoint, data) {
             try {
                 const response = await fetch(endpoint, {
@@ -292,7 +329,6 @@
             }
         }
 
-        // === 4. 초기화 및 이벤트 리스너 ===
         function setupOptionButtons(id) {
             const group = document.getElementById(id);
             if(!group) return;
@@ -321,51 +357,59 @@
             setupOptionButtons('astro-gender-group');
             populateDateSelects();
 
-            // [사주 폼 제출]
+    
+            // [사주 폼 제출 수정본]
             document.getElementById('saju-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                if (!document.getElementById('saju-privacy').checked) { alert('개인정보 동의 필요'); return; }
+    e.preventDefault();
+    if (!document.getElementById('saju-privacy').checked) { alert('개인정보 동의 필요'); return; }
 
-                const name = document.getElementById('saju-name').value;
-                const gender = document.querySelector('#saju-gender-group .active').dataset.value;
-                const calendarType = document.querySelector('#saju-calendar-group .active').dataset.value === 'lunar' ? '음력' : '양력';
-                
-                const y = document.getElementById('saju-year').value;
-                const m = document.getElementById('saju-month').value;
-                const d = document.getElementById('saju-day').value;
-                const time = document.getElementById('saju-time').value;
+    const name = document.getElementById('saju-name').value;
+    const gender = document.querySelector('#saju-gender-group .active').dataset.value;
+    
+    // ⭐ 중요: 음력/양력 상태 가져오기
+    const calendarType = document.querySelector('#saju-calendar-group .active').dataset.value === 'lunar' ? '음력' : '양력';
+    
+    const y = document.getElementById('saju-year').value;
+    const m = document.getElementById('saju-month').value;
+    const d = document.getElementById('saju-day').value;
+    const time = document.getElementById('saju-time').value;
 
-                currentUserInfo = { 
-                    name, 
-                    gender: gender === 'male' ? '남성' : '여성', 
-                    birthDate: `${y}-${m}-${d}`, 
-                    birthTime: time,
-                    calendarType: calendarType 
-                };
-                currentRawData = { userInfo: currentUserInfo };
+    // 서버로 보낼 데이터 구조화
+    currentUserInfo = { 
+        name, 
+        gender: gender === 'male' ? '남성' : '여성', 
+        birthDate: `${y}-${m}-${d}`, 
+        birthTime: time, // 이제 "16:30" 같은 값이 들어감
+        calendarType: calendarType 
+    };
 
-                showResultScreen();
-                appendMessage('ai', `분석을 시작합니다... [${calendarType}] ${y}년 ${m}월 ${d}일 정보를 분석 중입니다.`);
-                
-                const res = await callApi('/api/saju/consultation', { rawData: currentRawData });
-                appendMessage('ai', res.success ? res.consultation : '오류 발생: ' + res.error);
-            });
-
-            // [점성술 폼 제출]
+    showResultScreen();
+    appendMessage('ai', `분석을 시작합니다... [${calendarType}] ${y}년 ${m}월 ${d}일 정보를 분석 중입니다.`);
+    
+    // API 호출 시 rawData 안에 userInfo를 넣어서 전송
+    const res = await callApi('/api/saju/consultation', { rawData: { userInfo: currentUserInfo } });
+    appendMessage('ai', res.success ? res.consultation : '오류 발생: ' + res.error);
+});
+            //[점성술 폼 제출]
             document.getElementById('astro-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 if (!document.getElementById('astro-privacy').checked) { alert('개인정보 동의 필요'); return; }
 
                 const name = document.getElementById('astro-name').value;
                 const gender = document.querySelector('#astro-gender-group .active').dataset.value;
-                const y = document.getElementById('astro-year').value;
-                const m = document.getElementById('astro-month').value;
-                const d = document.getElementById('astro-day').value;
+                const y = parseInt(document.getElementById('astro-year').value);
+                const m = parseInt(document.getElementById('astro-month').value);
+                const d = parseInt(document.getElementById('astro-day').value);
                 const time = document.getElementById('astro-time').value;
-                const location = document.getElementById('astro-location').value;
+                const location = document.getElementById('astro-location').value; // 위치 데이터 수집
 
-                currentUserInfo = { name, gender: gender === 'male' ? '남성' : '여성', birthDate: `${y}-${m}-${d}`, birthTime: time, location: location };
-                currentRawData = { userInfo: currentUserInfo };
+                // API 신뢰도를 위해 날짜 패딩 처리 (1 -> 01)
+                const fM = m.toString().padStart(2, '0');
+                const fD = d.toString().padStart(2, '0');
+
+                currentUserInfo = { name, gender, birthDate: `${y}-${fM}-${fD}`, birthTime: time, location: location };
+                const astroResult = calculateAstrology(y, m, d);
+                currentRawData = { userInfo: currentUserInfo, astrology: astroResult };
                 
                 showResultScreen();
                 appendMessage('ai', '별들의 위치를 계산 중입니다. 출생지 정보를 연동합니다...');
