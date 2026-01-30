@@ -3,21 +3,20 @@
    Updated: Saju Logic Integration & Korean Mapping
    ============================================ */
 
-import 'dotenv/config';
-import { Solar, Lunar } from 'lunar-javascript';
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+   import 'dotenv/config';
+   import { Solar, Lunar } from 'lunar-javascript';
+   import express from 'express';
+   import cors from 'cors';
+   import helmet from 'helmet';
+   import rateLimit from 'express-rate-limit';
+   import path from 'path';
+   import { fileURLToPath } from 'url';
+   import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-const PORT = process.env.PORT || 3000;
+   const __filename = fileURLToPath(import.meta.url);
+   const __dirname = path.dirname(__filename);
+   const app = express();
+   const PORT = process.env.PORT || 3000;
 
 // [1] 보안 및 미들웨어 설정
 app.use(helmet({
@@ -44,12 +43,9 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 // [2] Gemini API 설정 (2.0 Flash)
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
-
-if (apiKey && apiKey !== 'PLACEHOLDER_API_KEY') {
-    try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    } catch (e) { console.error("Model Init Failed", e); }
+if (apiKey) {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 }
 
 async function callGeminiAPI(prompt) {
@@ -86,26 +82,16 @@ const toHangul = (str) => str.split('').map(char => HAN_TO_HANGUL[char] || char)
 function calculateSajuText(userInfo) {
     if (!userInfo || !userInfo.birthDate) return null;
     try {
-        // 날짜와 시간을 합쳐서 숫자만 추출
         const fullDateStr = `${userInfo.birthDate} ${userInfo.birthTime || ""}`;
         const p = fullDateStr.match(/\d+/g);
-        
         if (!p || p.length < 3) return null;
 
         const year = parseInt(p[0]), month = parseInt(p[1]), day = parseInt(p[2]);
-        
-        // 시간 파싱: 텍스트(자시) 우선 확인 후 숫자(14:30) 추출
-        let hour = 0;
-        if (userInfo.birthTime && SAJU_TIME_MAP[userInfo.birthTime] !== undefined) {
-            hour = SAJU_TIME_MAP[userInfo.birthTime];
-        } else {
-            const timeMatch = (userInfo.birthTime || "").match(/\d+/g);
-            hour = timeMatch ? parseInt(timeMatch[0]) : 0;
-        }
+        // 시간에서 숫자(대표시간)만 추출하여 시(hour)로 사용
+        const hour = p[3] ? parseInt(p[3]) : 0;
 
         let eightChar;
-        // 음력/양력 유연하게 처리
-        if (userInfo.calendarType === '음력' || userInfo.calendarType === 'lunar') {
+        if (userInfo.calendarType === '음력') {
             eightChar = Lunar.fromYmdHms(year, month, day, hour, 0, 0).getEightChar();
         } else {
             eightChar = Solar.fromYmdHms(year, month, day, hour, 0, 0).getLunar().getEightChar();
@@ -116,7 +102,7 @@ function calculateSajuText(userInfo) {
                `${toHangul(eightChar.getDayGan())}${toHangul(eightChar.getDayZhi())}일 ` +
                `${toHangul(eightChar.getHourGan())}${toHangul(eightChar.getHourZhi())}시`;
     } catch (e) {
-        console.error("Saju Calculation Error:", e);
+        console.error("Calculation Failure:", e);
         return null;
     }
 }
@@ -157,23 +143,25 @@ Big 3(태양, 달, 상승궁)를 중심으로 해석하되 용어 설명은 생�
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        const prompt = getSajuPrompt(rawData);
+        const sajuText = calculateSajuText(rawData.userInfo);
+        if (!sajuText) return res.status(400).json({ success: false, error: '날짜 정보가 부족하거나 형식이 틀립니다.' });
+
+        const prompt = `${BASE_INSTRUCTION}\n[분석 데이터] 사주 명식: ${sajuText}\n🚨 반드시 답변 시작 시 "사주 명식: ${sajuText}"를 출력하세요.`;
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
-        res.status(500).json({ success: false, error: '분석 중 오류 발생' });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
-app.post('/api/astrology/consultation', async (req, res) => {
+app.post('/api/saju/chat', async (req, res) => {
     try {
-        const { rawData } = req.body;
-        const prompt = getAstrologyPrompt(rawData);
-        const consultation = await callGeminiAPI(prompt);
-        res.json({ success: true, consultation });
-    } catch (error) {
-        res.status(500).json({ success: false, error: '분석 중 오류 발생' });
-    }
+        const { userMessage, rawData } = req.body;
+        const sajuText = calculateSajuText(rawData.userInfo);
+        const prompt = `${BASE_INSTRUCTION}\n사용자 사주: ${sajuText || "확인불가"}\n질문: "${userMessage}"\n위 명식을 기반으로 일관성 있게 답변하세요.`;
+        const answer = await callGeminiAPI(prompt);
+        res.json({ success: true, answer });
+    } catch (e) { res.status(500).json({ success: false, error: 'Chat Error' }); }
 });
 
 app.post('/api/saju/chat', async (req, res) => {

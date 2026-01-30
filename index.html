@@ -164,12 +164,18 @@
                     <div class="form-group"><label class="form-label">TIME</label>
                         <select id="saju-time" class="form-select" required>
                             <option value="unknown">시간 모름</option>
-                            <option value="자시">자시 (23:30~01:29)</option><option value="축시">축시 (01:30~03:29)</option>
-                            <option value="인시">인시 (03:30~05:29)</option><option value="묘시">묘시 (05:30~07:29)</option>
-                            <option value="진시">진시 (07:30~09:29)</option><option value="사시">사시 (09:30~11:29)</option>
-                            <option value="오시">오시 (11:30~13:29)</option><option value="미시">미시 (13:30~15:29)</option>
-                            <option value="신시">신시 (15:30~17:29)</option><option value="유시">유시 (17:30~19:29)</option>
-                            <option value="술시">술시 (19:30~21:29)</option><option value="해시">해시 (21:30~23:29)</option>
+                            <option value="00:30">자시 (23:30~01:29)</option>
+                            <option value="02:30">축시 (01:30~03:29)</option>
+                            <option value="04:30">인시 (03:30~05:29)</option>
+                            <option value="06:30">묘시 (05:30~07:29)</option>
+                            <option value="08:30">진시 (07:30~09:29)</option>
+                            <option value="10:30">사시 (09:30~11:29)</option>
+                            <option value="12:30">오시 (11:30~13:29)</option>
+                            <option value="14:30">미시 (13:30~15:29)</option>
+                            <option value="16:30">신시 (15:30~17:29)</option>
+                            <option value="18:30">유시 (17:30~19:29)</option>
+                            <option value="20:30">술시 (19:30~21:29)</option>
+                            <option value="22:30">해시 (21:30~23:29)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -353,14 +359,14 @@
 
     
             // [사주 폼 제출 수정본]
-document.getElementById('saju-form').addEventListener('submit', async (e) => {
+            document.getElementById('saju-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!document.getElementById('saju-privacy').checked) { alert('개인정보 동의 필요'); return; }
-    
+
     const name = document.getElementById('saju-name').value;
-    const genderVal = document.querySelector('#saju-gender-group .active').dataset.value;
+    const gender = document.querySelector('#saju-gender-group .active').dataset.value;
     
-    // ⭐ 음력/양력 선택값 추출
+    // ⭐ 중요: 음력/양력 상태 가져오기
     const calendarType = document.querySelector('#saju-calendar-group .active').dataset.value === 'lunar' ? '음력' : '양력';
     
     const y = document.getElementById('saju-year').value;
@@ -368,24 +374,23 @@ document.getElementById('saju-form').addEventListener('submit', async (e) => {
     const d = document.getElementById('saju-day').value;
     const time = document.getElementById('saju-time').value;
 
-    // 서버로 보낼 데이터 객체 구성
+    // 서버로 보낼 데이터 구조화
     currentUserInfo = { 
         name, 
-        gender: genderVal === 'male' ? '남성' : '여성', 
+        gender: gender === 'male' ? '남성' : '여성', 
         birthDate: `${y}-${m}-${d}`, 
-        birthTime: time,
+        birthTime: time, // 이제 "16:30" 같은 값이 들어감
         calendarType: calendarType 
     };
-    
-    // rawData 구조를 서버와 일치시킴
-    currentRawData = { userInfo: currentUserInfo };
 
     showResultScreen();
-    appendMessage('ai', `데이터 분석 중... [${calendarType}] ${y}년 ${m}월 ${d}일 ${time} 정보를 연동합니다.`);
+    appendMessage('ai', `분석을 시작합니다... [${calendarType}] ${y}년 ${m}월 ${d}일 정보를 분석 중입니다.`);
     
-    const res = await callApi('/api/saju/consultation', { rawData: currentRawData });
-    appendMessage('ai', res.success ? res.consultation : '오류가 발생했습니다: ' + res.error);
+    // API 호출 시 rawData 안에 userInfo를 넣어서 전송
+    const res = await callApi('/api/saju/consultation', { rawData: { userInfo: currentUserInfo } });
+    appendMessage('ai', res.success ? res.consultation : '오류 발생: ' + res.error);
 });
+</script>
             //[점성술 폼 제출]
             document.getElementById('astro-form').addEventListener('submit', async (e) => {
                 e.preventDefault();

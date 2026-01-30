@@ -39,6 +39,8 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
 // [2] Gemini API 설정 (2.0 Flash)
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
@@ -70,7 +72,7 @@ const BASE_INSTRUCTION = `
 
 const HAN_TO_HANGUL = {
     '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무', '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계',
-    '子': '자', '丑': '축', '寅': '인', '卯': '묘', '辰': '진', '巳': '사', '午': '오', '未': '미', '申': '신', '酉': '유', '戌': '술', '亥': '해'
+    '子': '자', '丑': '축', '寅': '인', '묘': '묘', '辰': '진', '巳': '사', '午': '오', '未': '미', '申': '신', '酉': '유', '戌': '술', '亥': '해'
 };
 
 const SAJU_TIME_MAP = {
@@ -82,16 +84,19 @@ const toHangul = (str) => str.split('').map(char => HAN_TO_HANGUL[char] || char)
 
 // [4] 통합 사주 계산 함수 (오류 방지 및 정확도 확보)
 function calculateSajuText(userInfo) {
+    if (!userInfo || !userInfo.birthDate) return null;
     try {
+        // 날짜와 시간을 합쳐서 숫자만 추출
         const fullDateStr = `${userInfo.birthDate} ${userInfo.birthTime || ""}`;
         const p = fullDateStr.match(/\d+/g);
+        
         if (!p || p.length < 3) return null;
 
         const year = parseInt(p[0]), month = parseInt(p[1]), day = parseInt(p[2]);
         
         // 시간 파싱: 텍스트(자시) 우선 확인 후 숫자(14:30) 추출
         let hour = 0;
-        if (SAJU_TIME_MAP[userInfo.birthTime]) {
+        if (userInfo.birthTime && SAJU_TIME_MAP[userInfo.birthTime] !== undefined) {
             hour = SAJU_TIME_MAP[userInfo.birthTime];
         } else {
             const timeMatch = (userInfo.birthTime || "").match(/\d+/g);
@@ -99,7 +104,7 @@ function calculateSajuText(userInfo) {
         }
 
         let eightChar;
-        // calendarType이 index.html에서 '음력' 혹은 'lunar'로 올 수 있으므로 유연하게 처리
+        // 음력/양력 유연하게 처리
         if (userInfo.calendarType === '음력' || userInfo.calendarType === 'lunar') {
             eightChar = Lunar.fromYmdHms(year, month, day, hour, 0, 0).getEightChar();
         } else {
@@ -120,7 +125,7 @@ function calculateSajuText(userInfo) {
 function getSajuPrompt(rawData) {
     const { userInfo } = rawData;
     const sajuText = calculateSajuText(userInfo);
-    if (!sajuText) return `${BASE_INSTRUCTION}\n\n[데이터 오류] 날짜 형식을 확인해주세요.`;
+    if (!sajuText) return `${BASE_INSTRUCTION}\n\n[오류] 입력하신 날짜 정보가 올바르지 않습니다. (예: 1990-01-01 형식)`;
 
     return `
 ${BASE_INSTRUCTION}
@@ -201,8 +206,6 @@ app.post('/api/astrology/chat', async (req, res) => {
         res.json({ success: true, answer });
     } catch (e) { res.status(500).json({ success: false, error: 'Chat Error' }); }
 });
-
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => console.log(`🚀 Server running: http://localhost:${PORT}`));
