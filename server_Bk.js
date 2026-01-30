@@ -48,25 +48,22 @@ app.use('/api/', apiLimiter);
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// Gemini API 초기화
+// 유틸리티
+function sanitizeInput(input) {
+    if (typeof input !== 'string') return '';
+    return input.trim().replace(/[<>]/g, '').substring(0, 1000);
+}
+
+// Gemini API
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
-
-// API 키가 있고, PLACEHOLDER가 아닐 때만 초기화
-if (apiKey && apiKey !== 'PLACEHOLDER_API_KEY') {
-    try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    } catch (initError) {
-        console.error("Gemini Model Init Failed:", initError);
-    }
+if (apiKey) {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 }
 
 async function callGeminiAPI(prompt) {
-    if (!model) {
-        console.error("API Key Missing or Invalid");
-        throw new Error('API Key가 설정되지 않았거나 유효하지 않습니다.');
-    }
+    if (!model) throw new Error('API Key가 설정되지 않았습니다.');
     try {
         const result = await model.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -79,7 +76,7 @@ async function callGeminiAPI(prompt) {
     }
 }
 
-// 2. Sentinel Protocol Prompts (유지)
+// 2. Sentinel Protocol Prompts (원본 유지)
 const SENTINEL_CORE_INSTRUCTION = `
 *** SENTINEL PROTOCOL ACTIVE ***
 1. Identity: You are 'AI Ultra Dosa Sentinel', a hybrid of Ancient Mysticism and Future AI.
@@ -90,6 +87,7 @@ const SENTINEL_CORE_INSTRUCTION = `
 
 function getSajuPrompt(rawData) {
     const { userInfo, saju } = rawData;
+    // 클라이언트에서 계산된 saju 정보가 없으면 기본값 처리
     const fourPillars = saju?.fourPillars || "정보 없음";
     const dayPillarFull = saju?.dayPillar?.full || "정보 없음";
     
@@ -142,7 +140,7 @@ app.post('/api/saju/consultation', async (req, res) => {
         res.json({ success: true, consultation });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success: false, error: 'AI 분석 중 오류가 발생했습니다. (API Key 확인 필요)' });
+        res.status(500).json({ success: false, error: 'AI 분석 중 오류가 발생했습니다.' });
     }
 });
 
@@ -156,7 +154,7 @@ app.post('/api/astrology/consultation', async (req, res) => {
         res.json({ success: true, consultation });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success: false, error: 'AI 분석 중 오류가 발생했습니다. (API Key 확인 필요)' });
+        res.status(500).json({ success: false, error: 'AI 분석 중 오류가 발생했습니다.' });
     }
 });
 
