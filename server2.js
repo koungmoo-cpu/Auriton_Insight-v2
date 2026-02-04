@@ -1,6 +1,6 @@
 /* ============================================
-   🖥️ Auriton InsightAI v3.2 - Server (Fixed)
-   Updated: robust date parsing & typo fix
+   🖥️ Auriton InsightAI v3.1 - Server (Leap Month Fixed)
+   Updated: Lunar Leap Month Support Added
    ============================================ */
 
 import 'dotenv/config';
@@ -41,7 +41,7 @@ app.use('/api/', apiLimiter);
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// [2] Gemini API 설정
+// [2] Gemini API 설정 (2.0 Flash)
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
 
@@ -61,83 +61,97 @@ async function callGeminiAPI(prompt) {
     return await result.response.text();
 }
 
-// [3] 공통 설정 및 한글 매핑 로직 (오타 수정됨)
+// [3] 공통 설정 및 한글 매핑 로직
 const BASE_INSTRUCTION = `
 당신은 고대의 지혜와 미래의 AI가 결합된 'Auriton InsightAI'의 마스터입니다.
 모든 답변은 한국어 경어체(해요체)로 작성하세요.
-절대로 뻔한 이론적인 설명은 하지 말고, 사용자에 대한 통찰과 해석을 제공하세요.
+절대로 뻔한 이론적인 설명(예: "태양은 자아를 상징하며...")을 하지 마세요.
+사용자는 점성학 강의를 듣고 싶은 게 아니라, "나에 대한 해석"을 원합니다.
+직설적이고, 통찰력 있게, 사용자의 내면을 꿰뚫어 보는 듯한 톤으로 말하세요.
 `;
 
 const HAN_TO_HANGUL = {
     '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무', '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계',
-    '子': '자', '丑': '축', '寅': '인', '卯': '묘', '辰': '진', '巳': '사', '午': '오', '未': '미', '申': '신', '酉': '유', '戌': '술', '亥': '해'
+    '子': '자', '丑': '축', '寅': '인', '묘': '묘', '辰': '진', '巳': '사', '午': '오', '未': '미', '申': '신', '酉': '유', '戌': '술', '亥': '해'
 };
 
-const toHangul = (str) => {
-    if (!str) return '';
-    return str.split('').map(char => HAN_TO_HANGUL[char] || char).join('');
+const SAJU_TIME_MAP = {
+    '자시': 0, '축시': 2, '인시': 4, '묘시': 6, '진시': 8, '사시': 10,
+    '오시': 12, '미시': 14, '신시': 16, '유시': 18, '술시': 20, '해시': 22
 };
 
-// [4] 통합 사주 계산 함수 (Robust Version)
+const toHangul = (str) => str.split('').map(char => HAN_TO_HANGUL[char] || char).join('');
+
+// [4] 통합 사주 계산 함수 (윤달 지원 추가)
 function calculateSajuText(userInfo) {
-    console.log("🔍 [Saju Calc] UserInfo:", JSON.stringify(userInfo));
-
-    if (!userInfo || !userInfo.birthDate) {
-        console.error("❌ [Saju Calc] Missing birthDate");
+    console.log("🔍 [calculateSajuText] 시작");
+    console.log("🔍 [calculateSajuText] userInfo:", JSON.stringify(userInfo));
+    
+    if (!userInfo) {
+        console.error("❌ [calculateSajuText] userInfo is null/undefined");
         return null;
     }
-
+    
+    if (!userInfo.birthDate) {
+        console.error("❌ [calculateSajuText] No birthDate in userInfo");
+        return null;
+    }
+    
     try {
-        // 1. 날짜 파싱 (안전하게 split 사용)
-        // birthDate 형식: "YYYY-MM-DD"
-        const [yearStr, monthStr, dayStr] = userInfo.birthDate.split('-');
-        const year = parseInt(yearStr, 10);
-        const month = parseInt(monthStr, 10);
-        const day = parseInt(dayStr, 10);
-
-        if (isNaN(year) || isNaN(month) || isNaN(day)) {
-            throw new Error(`날짜 형식이 올바르지 않습니다: ${userInfo.birthDate}`);
+        const fullDateStr = `${userInfo.birthDate} ${userInfo.birthTime || ""}`;
+        const p = fullDateStr.match(/\d+/g);
+        
+        if (!p || p.length < 3) {
+            console.error("❌ Invalid date format:", fullDateStr);
+            return null;
         }
 
-        // 2. 시간 파싱
-        let hour = 12; // 기본값: 낮 12시
+        const year = parseInt(p[0]), month = parseInt(p[1]), day = parseInt(p[2]);
+        
+        console.log(`📅 입력 데이터:`, JSON.stringify(userInfo, null, 2));
+        console.log(`📅 파싱 결과: ${year}년 ${month}월 ${day}일 (${userInfo.calendarType})`);
+        console.log(`🕐 시간 원본: "${userInfo.birthTime}"`);
+        
+        let hour = 0;
         if (userInfo.birthTime && userInfo.birthTime !== 'unknown') {
-            // "16:30" 같은 문자열에서 숫자만 추출
-            const timeMatch = userInfo.birthTime.match(/(\d+):(\d+)/);
-            if (timeMatch) {
-                hour = parseInt(timeMatch[1], 10);
+            if (SAJU_TIME_MAP[userInfo.birthTime] !== undefined) {
+                // 한글 시간 (자시, 축시 등)
+                hour = SAJU_TIME_MAP[userInfo.birthTime];
+            } else {
+                // 숫자 형식 (00:30, 16:30 등)
+                const timeMatch = userInfo.birthTime.match(/\d+/g);
+                hour = timeMatch ? parseInt(timeMatch[0]) : 0;
             }
+        } else {
+            // 시간 모름 → 12시(낮)로 기본 설정
+            hour = 12;
         }
-        console.log(`📅 Parsed: ${year}-${month}-${day}, Hour: ${hour}, Type: ${userInfo.calendarType}`);
+        
+        console.log(`🕐 최종 시간: ${hour}시`);
 
-        // 3. 만세력 계산 (Lunar library)
         let eightChar;
         const calType = userInfo.calendarType || 'solar';
-
-        if (calType.includes('음력') || calType.includes('lunar')) {
-             // 음력 (윤달 처리 포함 - 단, 라이브러리 지원 범위 내)
-             // 주의: lunar-javascript의 기본 fromYmdHms는 평달 기준입니다.
-             // 윤달을 정확히 지정하려면 라이브러리 스펙에 따라 Lunar.fromYmdHms(yyyy, -mm, ...) 등을 써야 할 수 있으나
-             // 여기서는 일반 음력 변환을 수행합니다.
+        
+        if (calType === '음력' || calType === 'lunar') {
+            console.log("🌙 음력(평달) 처리");
+            eightChar = Lunar.fromYmdHms(year, month, day, hour, 0, 0).getEightChar();
+        } else if (calType === '음력-윤달' || calType === 'lunar-leap') {
+            console.log("🌙 음력(윤달) 처리");
             eightChar = Lunar.fromYmdHms(year, month, day, hour, 0, 0).getEightChar();
         } else {
-            // 양력
+            console.log("☀️ 양력 처리");
             eightChar = Solar.fromYmdHms(year, month, day, hour, 0, 0).getLunar().getEightChar();
         }
 
-        // 4. 결과 문자열 조합
-        // toHangul 함수가 null/undefined 체크를 하도록 수정됨
         const result = `${toHangul(eightChar.getYearGan())}${toHangul(eightChar.getYearZhi())}년 ` +
-                       `${toHangul(eightChar.getMonthGan())}${toHangul(eightChar.getMonthZhi())}월 ` +
-                       `${toHangul(eightChar.getDayGan())}${toHangul(eightChar.getDayZhi())}일 ` +
-                       `${toHangul(eightChar.getHourGan())}${toHangul(eightChar.getHourZhi())}시`;
-
-        console.log("✅ [Saju Calc] Result:", result);
+                      `${toHangul(eightChar.getMonthGan())}${toHangul(eightChar.getMonthZhi())}월 ` +
+                      `${toHangul(eightChar.getDayGan())}${toHangul(eightChar.getDayZhi())}일 ` +
+                      `${toHangul(eightChar.getHourGan())}${toHangul(eightChar.getHourZhi())}시`;
+        
+        console.log("✅ 사주 명식:", result);
         return result;
-
     } catch (e) {
-        console.error("❌ [Saju Calc Error] 상세 에러:", e);
-        // 사용자에게 보여줄 에러 메시지가 필요하면 여기서 throw 하거나 null 리턴
+        console.error("❌ Saju Calculation Error:", e);
         return null;
     }
 }
@@ -146,9 +160,7 @@ function calculateSajuText(userInfo) {
 function getSajuPrompt(rawData) {
     const { userInfo } = rawData;
     const sajuText = calculateSajuText(userInfo);
-    
-    // 계산 실패 시
-    if (!sajuText) return null;
+    if (!sajuText) return `${BASE_INSTRUCTION}\n\n[오류] 입력하신 날짜 정보가 올바르지 않습니다.`;
 
     return `
 ${BASE_INSTRUCTION}
@@ -180,27 +192,33 @@ Big 3(태양, 달, 상승궁)를 중심으로 해석하되 용어 설명은 생�
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        console.log("📥 [Saju API] Call Received");
+        console.log("📥 [Saju] Received data:", JSON.stringify(rawData, null, 2));
         
         if (!rawData || !rawData.userInfo) {
-            return res.json({ success: false, consultation: '데이터 오류: 사용자 정보가 없습니다.' });
-        }
-
-        const prompt = getSajuPrompt(rawData);
-        
-        // 사주 계산 실패 감지
-        if (!prompt) {
-            return res.json({ 
-                success: true, 
-                consultation: '죄송합니다. 날짜 정보를 변환하는 중 오류가 발생했습니다.\n(존재하지 않는 날짜이거나(예: 음력 2월 30일), 서버 내부 계산 오류입니다.)' 
+            console.error("❌ [Saju] No userInfo in rawData");
+            return res.status(400).json({ 
+                success: false, 
+                error: '데이터 형식 오류: userInfo가 없습니다.' 
             });
         }
         
+        const sajuText = calculateSajuText(rawData.userInfo);
+        if (!sajuText) {
+            console.error("❌ [Saju] calculateSajuText returned null");
+            console.error("❌ [Saju] userInfo was:", JSON.stringify(rawData.userInfo));
+            return res.json({ 
+                success: true, 
+                consultation: '죄송합니다. 입력하신 날짜 정보가 올바르지 않아 정확한 분석을 제공해 드릴 수 없습니다. 다시 한번 정확한 생년월일시를 확인해 주시면, 당신의 별자리를 깊이 있게 통찰하여 당신만의 고유한 이야기를 들려드리겠습니다. 당신의 내면을 비추는 등불이 되어 드리겠습니다.' 
+            });
+        }
+        
+        const prompt = getSajuPrompt(rawData);
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
-        console.error("❌ [Saju API Error]", error);
-        res.json({ success: false, consultation: '시스템 오류가 발생했습니다: ' + error.message });
+        console.error("❌ [Saju] API Error:", error);
+        console.error("❌ [Saju] Stack:", error.stack);
+        res.status(500).json({ success: false, error: '분석 중 오류 발생: ' + error.message });
     }
 });
 
@@ -211,7 +229,7 @@ app.post('/api/astrology/consultation', async (req, res) => {
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
-        res.json({ success: false, consultation: '별자리 분석 중 오류 발생.' });
+        res.status(500).json({ success: false, error: '분석 중 오류 발생' });
     }
 });
 
