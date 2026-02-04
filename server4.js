@@ -1,6 +1,6 @@
 /* ============================================
-   🖥️ Auriton InsightAI v3.4 - Final Fix
-   Updated: Fixed function names (Hour -> Time)
+   🖥️ Auriton InsightAI v3.3 - Final Debug Version
+   Updated: Explicit Error Reporting & Robust Parsing
    ============================================ */
 
 import 'dotenv/config';
@@ -19,7 +19,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// [1] 보안 및 미들웨어
+// [1] 보안 및 미들웨어 설정
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
@@ -32,6 +32,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
 
+// 디버깅을 위해 요청 제한을 조금 완화했습니다 (20 -> 50)
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 50,
@@ -41,7 +42,7 @@ app.use('/api/', apiLimiter);
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// [2] Gemini API
+// [2] Gemini API 설정
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
 
@@ -61,7 +62,8 @@ async function callGeminiAPI(prompt) {
     return await result.response.text();
 }
 
-// [3] 안전한 한글 매핑 로직
+// [3] 안전한 한글 매핑 로직 (Safe Mapping)
+// 이 부분이 빠지면 한자 변환 중 프로그램이 멈출 수 있습니다.
 const BASE_INSTRUCTION = `
 당신은 고대의 지혜와 미래의 AI가 결합된 'Auriton InsightAI'의 마스터입니다.
 모든 답변은 한국어 경어체(해요체)로 작성하세요.
@@ -75,17 +77,18 @@ const HAN_TO_HANGUL = {
 
 const toHangul = (str) => {
     if (!str) return '';
+    // 매핑 테이블에 없는 글자가 들어와도 에러를 내지 않고 원본 글자를 반환하도록 수정 (중요!)
     return str.split('').map(char => HAN_TO_HANGUL[char] || char).join('');
 };
 
-// [4] 사주 계산 함수 (함수명 수정됨!)
+// [4] 사주 계산 함수 (Debug Mode)
 function calculateSajuText(userInfo) {
     console.log("🔍 [Calc Start] Input Data:", JSON.stringify(userInfo));
 
     try {
         if (!userInfo || !userInfo.birthDate) throw new Error("생년월일 정보가 누락되었습니다.");
 
-        // 1. 날짜 파싱
+        // 1. 날짜 파싱 (안전 장치 강화)
         const parts = userInfo.birthDate.split('-');
         if (parts.length !== 3) throw new Error(`날짜 형식이 잘못되었습니다 (${userInfo.birthDate})`);
 
@@ -96,7 +99,7 @@ function calculateSajuText(userInfo) {
         if (isNaN(year) || isNaN(month) || isNaN(day)) throw new Error("날짜에 숫자가 아닌 값이 포함되어 있습니다.");
 
         // 2. 시간 파싱
-        let hour = 12; 
+        let hour = 12; // 기본값
         if (userInfo.birthTime && userInfo.birthTime !== 'unknown') {
             const timeMatch = userInfo.birthTime.match(/(\d+):(\d+)/);
             if (timeMatch) hour = parseInt(timeMatch[1], 10);
@@ -104,42 +107,36 @@ function calculateSajuText(userInfo) {
 
         console.log(`📅 Parsed: ${year}-${month}-${day} ${hour}:00, Type: ${userInfo.calendarType}`);
 
-        // 3. 만세력 변환
+        // 3. 만세력 변환 (라이브러리 호출)
         let eightChar;
         const calType = userInfo.calendarType || 'solar';
 
         if (calType.includes('음력') || calType.includes('lunar')) {
             console.log("🌙 Processing Lunar Date...");
+            // 음력 변환 시도
             const lunarObj = Lunar.fromYmdHms(year, month, day, hour, 0, 0);
-            if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
+            if (!lunarObj) throw new Error("음력 날짜 객체 생성에 실패했습니다 (유효하지 않은 날짜 가능성).");
             eightChar = lunarObj.getEightChar();
         } else {
             console.log("☀️ Processing Solar Date...");
+            // 양력 변환 시도
             const solarObj = Solar.fromYmdHms(year, month, day, hour, 0, 0);
-            if (!solarObj) throw new Error("양력 날짜 객체 생성 실패");
+            if (!solarObj) throw new Error("양력 날짜 객체 생성에 실패했습니다.");
             eightChar = solarObj.getLunar().getEightChar();
         }
 
-        // 4. 문자열 조합 (★ 여기가 수정된 핵심 부분입니다 ★)
-        // getHourGan -> getTimeGan 으로 변경되었습니다.
-        const yearGan = toHangul(eightChar.getYearGan());
-        const yearZhi = toHangul(eightChar.getYearZhi());
-        const monthGan = toHangul(eightChar.getMonthGan());
-        const monthZhi = toHangul(eightChar.getMonthZhi());
-        const dayGan = toHangul(eightChar.getDayGan());
-        const dayZhi = toHangul(eightChar.getDayZhi());
+        // 4. 문자열 조합
+        const result = `${toHangul(eightChar.getYearGan())}${toHangul(eightChar.getYearZhi())}년 ` +
+                       `${toHangul(eightChar.getMonthGan())}${toHangul(eightChar.getMonthZhi())}월 ` +
+                       `${toHangul(eightChar.getDayGan())}${toHangul(eightChar.getDayZhi())}일 ` +
+                       `${toHangul(eightChar.getHourGan())}${toHangul(eightChar.getHourZhi())}시`;
         
-        // [수정 완료] 라이브러리 함수명에 맞춰 Hour -> Time으로 변경
-        const hourGan = toHangul(eightChar.getTimeGan()); 
-        const hourZhi = toHangul(eightChar.getTimeZhi());
-
-        const result = `${yearGan}${yearZhi}년 ${monthGan}${monthZhi}월 ${dayGan}${dayZhi}일 ${hourGan}${hourZhi}시`;
         console.log("✅ Result:", result);
-        
         return result;
 
     } catch (e) {
         console.error("❌ [Calculation Error]:", e.message);
+        // 에러를 숨기지 않고 리턴해서 프론트엔드로 보냄 (핵심!)
         return `ERROR: ${e.message}`;
     }
 }
@@ -148,17 +145,24 @@ function calculateSajuText(userInfo) {
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        
+        console.log("📥 [Saju API] Request Received");
+
+        // 1. 사주 계산 시도
         const sajuText = calculateSajuText(rawData?.userInfo);
         
+        // 2. 에러 체크 (계산 함수가 'ERROR:' 문자열을 반환했는지 확인)
         if (!sajuText || sajuText.startsWith('ERROR:')) {
             const errorMsg = sajuText ? sajuText.replace('ERROR: ', '') : '알 수 없는 오류';
+            
+            // 여기서 success: true를 주면서 내용은 에러 메시지를 담아보냅니다.
+            // 그래야 프론트엔드 채팅창에 에러 내용이 뜹니다.
             return res.json({ 
                 success: true, 
-                consultation: `🚫 **분석 오류 발생**\n\n죄송합니다. 오류가 발생했습니다.\n\n**상세 에러:**\n${errorMsg}\n\n다시 시도해주세요.` 
+                consultation: `🚫 **분석 오류 발생**\n\n죄송합니다. 날짜 변환 중 문제가 발생했습니다.\n\n**상세 에러 내용:**\n${errorMsg}\n\n이 내용을 캡처하거나 메모하여 알려주시면 해결해 드릴 수 있습니다.` 
             });
         }
 
+        // 3. 정상 성공 시 Gemini 프롬프트 생성
         const prompt = `
 ${BASE_INSTRUCTION}
 [분석 데이터]
@@ -176,6 +180,7 @@ ${BASE_INSTRUCTION}
 
     } catch (error) {
         console.error("❌ [API Route Error]", error);
+        // 서버 자체가 터졌을 때
         res.json({ success: false, consultation: `서버 내부 치명적 오류: ${error.message}` });
     }
 });
@@ -202,6 +207,7 @@ app.post('/api/saju/chat', async (req, res) => {
         const { userMessage, rawData } = req.body;
         const sajuText = calculateSajuText(rawData.userInfo);
         
+        // 채팅 중에도 에러가 나면 알려줌
         if (!sajuText || sajuText.startsWith('ERROR:')) {
              return res.json({ success: true, answer: "죄송합니다. 사주 정보를 불러오는 중 오류가 발생했습니다." });
         }
