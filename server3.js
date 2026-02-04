@@ -1,6 +1,6 @@
 /* ============================================
-   🖥️ Auriton InsightAI v3.3 - Final Debug Version
-   Updated: Explicit Error Reporting & Robust Parsing
+   🖥️ Auriton InsightAI v3.2 - Server (Fixed)
+   Updated: robust date parsing & typo fix
    ============================================ */
 
 import 'dotenv/config';
@@ -32,10 +32,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
 
-// 디버깅을 위해 요청 제한을 조금 완화했습니다 (20 -> 50)
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 50,
+    max: 20,
     message: { success: false, error: '⚠️ 잠시 후 다시 시도해주세요.' }
 });
 app.use('/api/', apiLimiter);
@@ -62,8 +61,7 @@ async function callGeminiAPI(prompt) {
     return await result.response.text();
 }
 
-// [3] 안전한 한글 매핑 로직 (Safe Mapping)
-// 이 부분이 빠지면 한자 변환 중 프로그램이 멈출 수 있습니다.
+// [3] 공통 설정 및 한글 매핑 로직 (오타 수정됨)
 const BASE_INSTRUCTION = `
 당신은 고대의 지혜와 미래의 AI가 결합된 'Auriton InsightAI'의 마스터입니다.
 모든 답변은 한국어 경어체(해요체)로 작성하세요.
@@ -77,124 +75,139 @@ const HAN_TO_HANGUL = {
 
 const toHangul = (str) => {
     if (!str) return '';
-    // 매핑 테이블에 없는 글자가 들어와도 에러를 내지 않고 원본 글자를 반환하도록 수정 (중요!)
     return str.split('').map(char => HAN_TO_HANGUL[char] || char).join('');
 };
 
-// [4] 사주 계산 함수 (Debug Mode)
+// [4] 통합 사주 계산 함수 (Robust Version)
 function calculateSajuText(userInfo) {
-    console.log("🔍 [Calc Start] Input Data:", JSON.stringify(userInfo));
+    console.log("🔍 [Saju Calc] UserInfo:", JSON.stringify(userInfo));
+
+    if (!userInfo || !userInfo.birthDate) {
+        console.error("❌ [Saju Calc] Missing birthDate");
+        return null;
+    }
 
     try {
-        if (!userInfo || !userInfo.birthDate) throw new Error("생년월일 정보가 누락되었습니다.");
+        // 1. 날짜 파싱 (안전하게 split 사용)
+        // birthDate 형식: "YYYY-MM-DD"
+        const [yearStr, monthStr, dayStr] = userInfo.birthDate.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+        const day = parseInt(dayStr, 10);
 
-        // 1. 날짜 파싱 (안전 장치 강화)
-        const parts = userInfo.birthDate.split('-');
-        if (parts.length !== 3) throw new Error(`날짜 형식이 잘못되었습니다 (${userInfo.birthDate})`);
-
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const day = parseInt(parts[2], 10);
-
-        if (isNaN(year) || isNaN(month) || isNaN(day)) throw new Error("날짜에 숫자가 아닌 값이 포함되어 있습니다.");
-
-        // 2. 시간 파싱
-        let hour = 12; // 기본값
-        if (userInfo.birthTime && userInfo.birthTime !== 'unknown') {
-            const timeMatch = userInfo.birthTime.match(/(\d+):(\d+)/);
-            if (timeMatch) hour = parseInt(timeMatch[1], 10);
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+            throw new Error(`날짜 형식이 올바르지 않습니다: ${userInfo.birthDate}`);
         }
 
-        console.log(`📅 Parsed: ${year}-${month}-${day} ${hour}:00, Type: ${userInfo.calendarType}`);
+        // 2. 시간 파싱
+        let hour = 12; // 기본값: 낮 12시
+        if (userInfo.birthTime && userInfo.birthTime !== 'unknown') {
+            // "16:30" 같은 문자열에서 숫자만 추출
+            const timeMatch = userInfo.birthTime.match(/(\d+):(\d+)/);
+            if (timeMatch) {
+                hour = parseInt(timeMatch[1], 10);
+            }
+        }
+        console.log(`📅 Parsed: ${year}-${month}-${day}, Hour: ${hour}, Type: ${userInfo.calendarType}`);
 
-        // 3. 만세력 변환 (라이브러리 호출)
+        // 3. 만세력 계산 (Lunar library)
         let eightChar;
         const calType = userInfo.calendarType || 'solar';
 
         if (calType.includes('음력') || calType.includes('lunar')) {
-            console.log("🌙 Processing Lunar Date...");
-            // 음력 변환 시도
-            const lunarObj = Lunar.fromYmdHms(year, month, day, hour, 0, 0);
-            if (!lunarObj) throw new Error("음력 날짜 객체 생성에 실패했습니다 (유효하지 않은 날짜 가능성).");
-            eightChar = lunarObj.getEightChar();
+             // 음력 (윤달 처리 포함 - 단, 라이브러리 지원 범위 내)
+             // 주의: lunar-javascript의 기본 fromYmdHms는 평달 기준입니다.
+             // 윤달을 정확히 지정하려면 라이브러리 스펙에 따라 Lunar.fromYmdHms(yyyy, -mm, ...) 등을 써야 할 수 있으나
+             // 여기서는 일반 음력 변환을 수행합니다.
+            eightChar = Lunar.fromYmdHms(year, month, day, hour, 0, 0).getEightChar();
         } else {
-            console.log("☀️ Processing Solar Date...");
-            // 양력 변환 시도
-            const solarObj = Solar.fromYmdHms(year, month, day, hour, 0, 0);
-            if (!solarObj) throw new Error("양력 날짜 객체 생성에 실패했습니다.");
-            eightChar = solarObj.getLunar().getEightChar();
+            // 양력
+            eightChar = Solar.fromYmdHms(year, month, day, hour, 0, 0).getLunar().getEightChar();
         }
 
-        // 4. 문자열 조합
+        // 4. 결과 문자열 조합
+        // toHangul 함수가 null/undefined 체크를 하도록 수정됨
         const result = `${toHangul(eightChar.getYearGan())}${toHangul(eightChar.getYearZhi())}년 ` +
                        `${toHangul(eightChar.getMonthGan())}${toHangul(eightChar.getMonthZhi())}월 ` +
                        `${toHangul(eightChar.getDayGan())}${toHangul(eightChar.getDayZhi())}일 ` +
                        `${toHangul(eightChar.getHourGan())}${toHangul(eightChar.getHourZhi())}시`;
-        
-        console.log("✅ Result:", result);
+
+        console.log("✅ [Saju Calc] Result:", result);
         return result;
 
     } catch (e) {
-        console.error("❌ [Calculation Error]:", e.message);
-        // 에러를 숨기지 않고 리턴해서 프론트엔드로 보냄 (핵심!)
-        return `ERROR: ${e.message}`;
+        console.error("❌ [Saju Calc Error] 상세 에러:", e);
+        // 사용자에게 보여줄 에러 메시지가 필요하면 여기서 throw 하거나 null 리턴
+        return null;
     }
 }
 
-// [5] API 라우트
-app.post('/api/saju/consultation', async (req, res) => {
-    try {
-        const { rawData } = req.body;
-        console.log("📥 [Saju API] Request Received");
+// [5] 프롬프트 생성 함수
+function getSajuPrompt(rawData) {
+    const { userInfo } = rawData;
+    const sajuText = calculateSajuText(userInfo);
+    
+    // 계산 실패 시
+    if (!sajuText) return null;
 
-        // 1. 사주 계산 시도
-        const sajuText = calculateSajuText(rawData?.userInfo);
-        
-        // 2. 에러 체크 (계산 함수가 'ERROR:' 문자열을 반환했는지 확인)
-        if (!sajuText || sajuText.startsWith('ERROR:')) {
-            const errorMsg = sajuText ? sajuText.replace('ERROR: ', '') : '알 수 없는 오류';
-            
-            // 여기서 success: true를 주면서 내용은 에러 메시지를 담아보냅니다.
-            // 그래야 프론트엔드 채팅창에 에러 내용이 뜹니다.
-            return res.json({ 
-                success: true, 
-                consultation: `🚫 **분석 오류 발생**\n\n죄송합니다. 날짜 변환 중 문제가 발생했습니다.\n\n**상세 에러 내용:**\n${errorMsg}\n\n이 내용을 캡처하거나 메모하여 알려주시면 해결해 드릴 수 있습니다.` 
-            });
-        }
-
-        // 3. 정상 성공 시 Gemini 프롬프트 생성
-        const prompt = `
+    return `
 ${BASE_INSTRUCTION}
 [분석 데이터]
-- 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
+- 이름: ${userInfo.name} (${userInfo.gender})
 - 확정 사주 명식: ${sajuText}
 
+[임무: 사주 명식 기반 운명 독해]
 **🚨 중요: 반드시 답변의 맨 첫 줄에 "사주 명식: ${sajuText}"를 출력한 후 해설을 시작하세요.**
 
 1. **핵심 본성 (일간 분석)**: 이 사람이 어떤 기질을 타고났는지 비유를 들어 설명하세요.
 2. **에너지의 균형**: 강한 기운과 부족한 기운이 삶에 미치는 영향을 분석하세요.
 3. **현대적 개운법**: 구체적인 색상, 행동 지침을 제안하세요.
 `;
+}
+
+function getAstrologyPrompt(rawData) {
+    const { userInfo } = rawData;
+    return `
+${BASE_INSTRUCTION}
+[분석 대상]
+- 이름: ${userInfo.name}
+- 생년월일: ${userInfo.birthDate} ${userInfo.birthTime}
+Big 3(태양, 달, 상승궁)를 중심으로 해석하되 용어 설명은 생략하세요.
+`;
+}
+
+// [6] API 라우트
+app.post('/api/saju/consultation', async (req, res) => {
+    try {
+        const { rawData } = req.body;
+        console.log("📥 [Saju API] Call Received");
+        
+        if (!rawData || !rawData.userInfo) {
+            return res.json({ success: false, consultation: '데이터 오류: 사용자 정보가 없습니다.' });
+        }
+
+        const prompt = getSajuPrompt(rawData);
+        
+        // 사주 계산 실패 감지
+        if (!prompt) {
+            return res.json({ 
+                success: true, 
+                consultation: '죄송합니다. 날짜 정보를 변환하는 중 오류가 발생했습니다.\n(존재하지 않는 날짜이거나(예: 음력 2월 30일), 서버 내부 계산 오류입니다.)' 
+            });
+        }
+        
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
-
     } catch (error) {
-        console.error("❌ [API Route Error]", error);
-        // 서버 자체가 터졌을 때
-        res.json({ success: false, consultation: `서버 내부 치명적 오류: ${error.message}` });
+        console.error("❌ [Saju API Error]", error);
+        res.json({ success: false, consultation: '시스템 오류가 발생했습니다: ' + error.message });
     }
 });
 
 app.post('/api/astrology/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        const prompt = `
-${BASE_INSTRUCTION}
-[분석 대상]
-- 이름: ${rawData.userInfo.name}
-- 생년월일: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime}
-Big 3(태양, 달, 상승궁)를 중심으로 해석하되 용어 설명은 생략하세요.
-`;
+        const prompt = getAstrologyPrompt(rawData);
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
@@ -206,17 +219,11 @@ app.post('/api/saju/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
         const sajuText = calculateSajuText(rawData.userInfo);
-        
-        // 채팅 중에도 에러가 나면 알려줌
-        if (!sajuText || sajuText.startsWith('ERROR:')) {
-             return res.json({ success: true, answer: "죄송합니다. 사주 정보를 불러오는 중 오류가 발생했습니다." });
-        }
-
         const prompt = `
 ${BASE_INSTRUCTION}
 [상황: 사주 상세 상담 채팅]
 - 사용자: ${rawData.userInfo.name}
-- **확정 사주 명식: ${sajuText}**
+- **확정 사주 명식: ${sajuText || "정보 확인 불가"}**
 - 질문: "${userMessage}"
 
 🚨 **작성 지침:**
