@@ -1,6 +1,8 @@
 /* ============================================
-   🖥️ Auriton InsightAI v3.4 - Final Fix
-   Updated: Fixed function names (Hour -> Time)
+   🖥️ Auriton InsightAI v4.0 - Error Handling Enhanced
+   Updated: 2025-02-05
+   - 궁합 계산 오류 처리 추가
+   - 운세 세분화 기능 추가 (일간/주간/월간/올해/10년/총운)
    ============================================ */
 
 import 'dotenv/config';
@@ -78,14 +80,13 @@ const toHangul = (str) => {
     return str.split('').map(char => HAN_TO_HANGUL[char] || char).join('');
 };
 
-// [4] 사주 계산 함수 (함수명 수정됨!)
+// [4] 사주 계산 함수
 function calculateSajuText(userInfo) {
     console.log("🔍 [Calc Start] Input Data:", JSON.stringify(userInfo));
 
     try {
         if (!userInfo || !userInfo.birthDate) throw new Error("생년월일 정보가 누락되었습니다.");
 
-        // 1. 날짜 파싱
         const parts = userInfo.birthDate.split('-');
         if (parts.length !== 3) throw new Error(`날짜 형식이 잘못되었습니다 (${userInfo.birthDate})`);
 
@@ -95,7 +96,6 @@ function calculateSajuText(userInfo) {
 
         if (isNaN(year) || isNaN(month) || isNaN(day)) throw new Error("날짜에 숫자가 아닌 값이 포함되어 있습니다.");
 
-        // 2. 시간 파싱
         let hour = 12; 
         if (userInfo.birthTime && userInfo.birthTime !== 'unknown') {
             const timeMatch = userInfo.birthTime.match(/(\d+):(\d+)/);
@@ -104,7 +104,6 @@ function calculateSajuText(userInfo) {
 
         console.log(`📅 Parsed: ${year}-${month}-${day} ${hour}:00, Type: ${userInfo.calendarType}`);
 
-        // 3. 만세력 변환
         let eightChar;
         const calType = userInfo.calendarType || 'solar';
 
@@ -120,16 +119,12 @@ function calculateSajuText(userInfo) {
             eightChar = solarObj.getLunar().getEightChar();
         }
 
-        // 4. 문자열 조합 (★ 여기가 수정된 핵심 부분입니다 ★)
-        // getHourGan -> getTimeGan 으로 변경되었습니다.
         const yearGan = toHangul(eightChar.getYearGan());
         const yearZhi = toHangul(eightChar.getYearZhi());
         const monthGan = toHangul(eightChar.getMonthGan());
         const monthZhi = toHangul(eightChar.getMonthZhi());
         const dayGan = toHangul(eightChar.getDayGan());
         const dayZhi = toHangul(eightChar.getDayZhi());
-        
-        // [수정 완료] 라이브러리 함수명에 맞춰 Hour -> Time으로 변경
         const hourGan = toHangul(eightChar.getTimeGan()); 
         const hourZhi = toHangul(eightChar.getTimeZhi());
 
@@ -145,6 +140,130 @@ function calculateSajuText(userInfo) {
 }
 
 // [5] API 라우트
+
+// [5-1] 궁합 계산 API (오류 처리 강화)
+app.post('/api/compatibility', async (req, res) => {
+    try {
+        const { person1, person2 } = req.body;
+        
+        if (!person1 || !person2) {
+            return res.json({ 
+                success: false, 
+                error: '두 사람의 정보가 모두 필요합니다.' 
+            });
+        }
+
+        const saju1 = calculateSajuText(person1);
+        const saju2 = calculateSajuText(person2);
+        
+        if (saju1.startsWith('ERROR:') || saju2.startsWith('ERROR:')) {
+            return res.json({ 
+                success: false, 
+                error: '궁합 계산 중 오류가 발생했습니다. 입력 정보를 확인해주세요.' 
+            });
+        }
+
+        const prompt = `
+${BASE_INSTRUCTION}
+[궁합 분석]
+- 첫 번째 사람: ${person1.name} - ${saju1}
+- 두 번째 사람: ${person2.name} - ${saju2}
+
+두 사람의 사주 궁합을 음양오행 관점에서 분석하고, 관계 발전을 위한 조언을 해주세요.
+`;
+        const result = await callGeminiAPI(prompt);
+        res.json({ success: true, analysis: result });
+        
+    } catch (error) {
+        console.error("❌ [Compatibility Error]", error);
+        res.json({ 
+            success: false, 
+            error: '궁합 분석 중 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' 
+        });
+    }
+});
+
+// [5-2] 운세 세분화 API
+app.post('/api/saju/fortune', async (req, res) => {
+    try {
+        const { rawData, fortuneType } = req.body;
+        
+        const sajuText = calculateSajuText(rawData?.userInfo);
+        
+        if (!sajuText || sajuText.startsWith('ERROR:')) {
+            return res.json({ 
+                success: false, 
+                error: '사주 정보를 불러올 수 없습니다.' 
+            });
+        }
+
+        const fortunePrompts = {
+            daily: {
+                title: '오늘의 운세',
+                maxLength: 700,
+                instruction: '오늘 하루의 에너지 흐름과 주의사항을 700자 이내로 간결하게 설명하세요.'
+            },
+            weekly: {
+                title: '이번 주 운세',
+                maxLength: 700,
+                instruction: '이번 주의 전반적인 흐름과 중요 포인트를 700자 이내로 설명하세요.'
+            },
+            monthly: {
+                title: '이번 달 운세',
+                maxLength: 700,
+                instruction: '이번 달의 운세와 집중해야 할 영역을 700자 이내로 설명하세요.'
+            },
+            yearly: {
+                title: '올해의 운세',
+                maxLength: 1500,
+                instruction: '올해 전체의 큰 흐름, 기회와 도전을 1500자 이내로 상세히 설명하세요.'
+            },
+            decade: {
+                title: '10년 운세',
+                maxLength: 4000,
+                instruction: '향후 10년간의 대운 흐름과 각 시기별 특징을 4000자 이내로 깊이 있게 분석하세요.'
+            },
+            total: {
+                title: '총운',
+                maxLength: 2000,
+                instruction: '일생의 큰 흐름과 타고난 운명적 특징을 2000자 이내로 종합적으로 설명하세요.'
+            }
+        };
+
+        const config = fortunePrompts[fortuneType];
+        if (!config) {
+            return res.json({ success: false, error: '올바른 운세 타입이 아닙니다.' });
+        }
+
+        const prompt = `
+${BASE_INSTRUCTION}
+[${config.title} 분석]
+- 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
+- 사주 명식: ${sajuText}
+- 생년월일: ${rawData.userInfo.birthDate}
+
+${config.instruction}
+
+답변은 반드시 ${config.maxLength}자를 초과하지 않도록 작성하세요.
+`;
+
+        const fortune = await callGeminiAPI(prompt);
+        res.json({ 
+            success: true, 
+            fortune: fortune,
+            fortuneType: config.title
+        });
+
+    } catch (error) {
+        console.error("❌ [Fortune Error]", error);
+        res.json({ 
+            success: false, 
+            error: '운세 분석 중 오류가 발생했습니다.' 
+        });
+    }
+});
+
+// [5-3] 사주 상담 API
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
@@ -180,23 +299,20 @@ ${BASE_INSTRUCTION}
     }
 });
 
+// [5-4] 점성학 상담 API (서비스 예정 메시지 추가)
 app.post('/api/astrology/consultation', async (req, res) => {
     try {
-        const { rawData } = req.body;
-        const prompt = `
-${BASE_INSTRUCTION}
-[분석 대상]
-- 이름: ${rawData.userInfo.name}
-- 생년월일: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime}
-Big 3(태양, 달, 상승궁)를 중심으로 해석하되 용어 설명은 생략하세요.
-`;
-        const consultation = await callGeminiAPI(prompt);
-        res.json({ success: true, consultation });
+        // 서비스 예정 메시지
+        res.json({ 
+            success: true, 
+            consultation: '⭐ **서양 점성학 서비스 준비 중**\n\n더욱 정확한 점성학 분석을 위해 시스템을 개선하고 있습니다.\n\n빠른 시일 내에 만나뵙겠습니다! 💫' 
+        });
     } catch (error) {
         res.json({ success: false, consultation: '별자리 분석 중 오류 발생.' });
     }
 });
 
+// [5-5] 사주 채팅 API
 app.post('/api/saju/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
@@ -224,13 +340,12 @@ ${BASE_INSTRUCTION}
     }
 });
 
+// [5-6] 점성학 채팅 API (서비스 예정)
 app.post('/api/astrology/chat', async (req, res) => {
-    try {
-        const { userMessage, rawData } = req.body;
-        const prompt = `${BASE_INSTRUCTION}\n사용자: ${rawData.userInfo.name}\n질문: "${userMessage}"\n별들의 배치를 기반으로 답변하세요.`;
-        const answer = await callGeminiAPI(prompt);
-        res.json({ success: true, answer });
-    } catch (e) { res.status(500).json({ success: false, error: 'Chat Error' }); }
+    res.json({ 
+        success: true, 
+        answer: '점성학 서비스는 현재 준비 중입니다. 조금만 기다려주세요! ⭐' 
+    });
 });
 
 if (process.env.NODE_ENV !== 'production') {

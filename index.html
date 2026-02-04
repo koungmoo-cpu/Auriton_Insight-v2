@@ -148,6 +148,32 @@
             <h2 class="header-sub" style="margin:0; text-align:left">ANALYSIS RESULT</h2>
             <button onclick="goHome()" style="background:none; border:1px solid #444; color:#888; padding:5px 10px; font-size:0.7rem">NEW SCAN</button>
         </div>
+        
+        <!-- Fortune Type Buttons (사주 분석 후에만 표시) -->
+        <div id="fortune-buttons" style="display:none; margin-bottom:20px; background:rgba(20,15,35,0.6); padding:15px; border-radius:8px; border:1px solid rgba(176,38,255,0.3)">
+            <div style="text-align:center; color:#ffd700; font-size:0.8rem; margin-bottom:12px; font-family:'Orbitron'">📊 운세 상세 분석</div>
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px">
+                <button class="fortune-btn" data-fortune="daily" style="padding:10px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    일간 운세
+                </button>
+                <button class="fortune-btn" data-fortune="weekly" style="padding:10px; background:linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    주간 운세
+                </button>
+                <button class="fortune-btn" data-fortune="monthly" style="padding:10px; background:linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    월간 운세
+                </button>
+                <button class="fortune-btn" data-fortune="yearly" style="padding:10px; background:linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    올해의 운세
+                </button>
+                <button class="fortune-btn" data-fortune="decade" style="padding:10px; background:linear-gradient(135deg, #fa709a 0%, #fee140 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    10년 운세
+                </button>
+                <button class="fortune-btn" data-fortune="total" style="padding:10px; background:linear-gradient(135deg, #30cfd0 0%, #330867 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    총운
+                </button>
+            </div>
+        </div>
+        
         <div class="chat-container">
             <div id="chat-box" class="chat-box"></div>
             <div class="chat-input-area" id="chat-input-area">
@@ -155,6 +181,7 @@
                 <button onclick="sendChat()" class="send-btn">SEND</button>
             </div>
         </div>
+    </section>
     </section>
 
     <script>
@@ -210,6 +237,9 @@
         // --- API Calls ---
         // 1. 개인 사주 분석
         async function submitSaju(e) {
+            // 사주 분석 성공 시 운세 버튼 표시
+            currentMode = "saju";
+            document.getElementById("fortune-buttons").style.display = "block";
             e.preventDefault();
             const name = document.getElementById('s-name').value;
             const gender = document.querySelector('#s-gender-box .active').dataset.val;

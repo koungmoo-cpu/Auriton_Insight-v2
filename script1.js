@@ -1,6 +1,5 @@
 /* ============================================
-   Auriton InsightAI - Script v4.0
-   Added: Fortune type buttons and enhanced error handling
+   Auriton InsightAI - Script
    ============================================ */
 
 // Global Variables
@@ -97,6 +96,7 @@ function showSection(section) {
         document.getElementById('selection-screen').classList.add('active');
     }
     
+    // Update nav items
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.onclick && item.onclick.toString().includes(section)) {
@@ -127,6 +127,7 @@ function backToSelection() {
     screens.forEach(s => s.classList.remove('active'));
     document.getElementById('selection-screen').classList.add('active');
     
+    // Clear chat
     const chatBox = document.getElementById('chat-box');
     if (chatBox) chatBox.innerHTML = '';
 }
@@ -218,38 +219,9 @@ async function callApi(endpoint, data) {
     }
 }
 
-// ========== Fortune Type Functions ==========
-async function showFortuneByType(fortuneType) {
-    if (!currentRawData || !currentRawData.userInfo) {
-        appendMessage('ai', '먼저 사주 분석을 완료해주세요.');
-        return;
-    }
-
-    const fortuneNames = {
-        'daily': '오늘의 운세',
-        'weekly': '이번 주 운세',
-        'monthly': '이번 달 운세',
-        'yearly': '올해의 운세',
-        'decade': '10년 운세',
-        'total': '총운'
-    };
-
-    appendMessage('ai', `${fortuneNames[fortuneType]} 분석 중입니다... 잠시만 기다려주세요.`);
-    
-    const res = await callApi('/api/saju/fortune', { 
-        rawData: currentRawData,
-        fortuneType: fortuneType
-    });
-    
-    if (res.success) {
-        appendMessage('ai', `📊 **${res.fortuneType}**\n\n${res.fortune}`);
-    } else {
-        appendMessage('ai', `오류 발생: ${res.error}`);
-    }
-}
-
 // ========== Astrology Calculation ==========
 function calculateAstrology(year, month, day) {
+    // Simple zodiac calculation
     const zodiacDates = [
         { sign: '양자리', start: [3, 21], end: [4, 19] },
         { sign: '황소자리', start: [4, 20], end: [5, 20] },
@@ -284,10 +256,12 @@ function calculateAstrology(year, month, day) {
 
 // ========== Init ==========
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Auriton InsightAI v4.0 Loaded');
+    console.log('Auriton InsightAI Loaded');
     
+    // Initialize canvas animation
     initNetworkCanvas();
     
+    // Setup forms
     setupOptionButtons('saju-gender-group');
     setupOptionButtons('saju-calendar-group');
     setupOptionButtons('astro-gender-group');
@@ -323,13 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 calendarType: calendarType
             };
             
-            currentRawData = { userInfo: currentUserInfo };
-            
             showResultScreen();
             appendMessage('ai', `분석을 시작합니다... [${calendarType}] ${year}년 ${month}월 ${day}일 정보를 분석 중입니다.`);
             
             const res = await callApi('/api/saju/consultation', { 
-                rawData: currentRawData
+                rawData: { userInfo: currentUserInfo } 
             });
             
             appendMessage('ai', res.success ? res.consultation : '오류 발생: ' + res.error);
@@ -400,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // Enter key for chat
     const userInput = document.getElementById('user-input');
     if (userInput) {
         userInput.addEventListener('keypress', (e) => {
@@ -408,13 +381,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
-    // Fortune Buttons Event Listeners
-    const fortuneBtns = document.querySelectorAll('.fortune-btn');
-    fortuneBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const fortuneType = btn.dataset.fortune;
-            showFortuneByType(fortuneType);
-        });
-    });
 });
