@@ -198,8 +198,10 @@
         function goHome() { 
             showScreen('screen-select'); 
             document.getElementById('chat-box').innerHTML = ''; // 채팅 초기화
+            document.getElementById('fortune-buttons').style.display = 'none'; // 운세 버튼 숨김
             currentUserInfo = null; // 데이터 초기화
             currentCoupleInfo = null;
+            currentMode = '';
         }
         function goSaju() { currentMode = 'saju'; showScreen('screen-saju'); }
         function goCouple() { currentMode = 'couple'; showScreen('screen-couple'); }
@@ -237,9 +239,6 @@
         // --- API Calls ---
         // 1. 개인 사주 분석
         async function submitSaju(e) {
-            // 사주 분석 성공 시 운세 버튼 표시
-            currentMode = "saju";
-            document.getElementById("fortune-buttons").style.display = "block";
             e.preventDefault();
             const name = document.getElementById('s-name').value;
             const gender = document.querySelector('#s-gender-box .active').dataset.val;
@@ -252,9 +251,14 @@
             // 전역 변수에 저장 (채팅할 때 씁니다!)
             currentUserInfo = { name, gender, birthDate: `${y}-${m}-${d}`, birthTime: t, calendarType: cal };
             
+            // 사주 모드 설정
+            currentMode = "saju";
+            
             showScreen('screen-result');
-            // 궁합 모드일 때는 채팅창 숨김 (복잡해서 일단 비활성화 추천)
             document.getElementById('chat-input-area').style.display = 'flex';
+            
+            // ✨ 운세 버튼 표시
+            document.getElementById('fortune-buttons').style.display = 'block';
             
             appendMsg('ai', "🔮 운명의 데이터를 분석하고 있습니다...\n(대운 흐름 계산 중)");
 
@@ -337,6 +341,67 @@
                 appendMsg('ai', "분석 데이터가 만료되었습니다. 다시 분석을 진행해주세요.");
             }
         }
+        
+        // ========== Fortune Button Functions ==========
+        async function showFortuneByType(fortuneType) {
+            if (!currentUserInfo) {
+                appendMsg('ai', '먼저 사주 분석을 완료해주세요.');
+                return;
+            }
+
+            const fortuneNames = {
+                'daily': '오늘의 운세',
+                'weekly': '이번 주 운세',
+                'monthly': '이번 달 운세',
+                'yearly': '올해의 운세',
+                'decade': '10년 운세',
+                'total': '총운'
+            };
+
+            appendMsg('ai', `📊 ${fortuneNames[fortuneType]} 분석 중입니다... 잠시만 기다려주세요.`);
+            
+            try {
+                const res = await fetch('/api/saju/fortune', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        rawData: { userInfo: currentUserInfo },
+                        fortuneType: fortuneType
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    appendMsg('ai', `📊 **${data.fortuneType}**\n\n${data.fortune}`);
+                } else {
+                    appendMsg('ai', `오류 발생: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Fortune API Error:', error);
+                appendMsg('ai', '운세 분석 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 운세 버튼 이벤트 리스너 등록
+        document.addEventListener('DOMContentLoaded', function() {
+            const fortuneBtns = document.querySelectorAll('.fortune-btn');
+            fortuneBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const fortuneType = this.dataset.fortune;
+                    showFortuneByType(fortuneType);
+                });
+                
+                // 호버 효과
+                btn.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-2px)';
+                    this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                });
+                btn.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                    this.style.boxShadow = 'none';
+                });
+            });
+        });
         
         // 엔터키 입력 시 전송
         document.getElementById('user-msg').addEventListener('keypress', function (e) {

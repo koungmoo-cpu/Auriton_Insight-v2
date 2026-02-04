@@ -299,20 +299,109 @@ ${BASE_INSTRUCTION}
     }
 });
 
-// [5-4] 점성학 상담 API (서비스 예정 메시지 추가)
+// [5-4] 점성학 상담 API
 app.post('/api/astrology/consultation', async (req, res) => {
     try {
-        // 서비스 예정 메시지
-        res.json({ 
-            success: true, 
-            consultation: '⭐ **서양 점성학 서비스 준비 중**\n\n더욱 정확한 점성학 분석을 위해 시스템을 개선하고 있습니다.\n\n빠른 시일 내에 만나뵙겠습니다! 💫' 
-        });
+        const { rawData } = req.body;
+        
+        const prompt = `
+${BASE_INSTRUCTION}
+[점성학 분석]
+- 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
+- 생년월일: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime}
+- 출생지: ${rawData.userInfo.location}
+
+서양 점성학 관점에서 이 사람의:
+1. **Big 3 (태양/달/상승궁)**: 핵심 성격과 내면
+2. **주요 행성 배치**: 금성, 화성, 수성의 영향
+3. **현재 운행 흐름**: 2026년 주요 행성의 움직임이 미치는 영향
+
+용어 설명은 최소화하고 실질적인 통찰을 제공하세요.
+`;
+        const consultation = await callGeminiAPI(prompt);
+        res.json({ success: true, consultation });
     } catch (error) {
-        res.json({ success: false, consultation: '별자리 분석 중 오류 발생.' });
+        console.error("❌ [Astrology Error]", error);
+        res.json({ success: false, consultation: '점성학 분석 중 오류 발생.' });
     }
 });
 
-// [5-5] 사주 채팅 API
+// [5-7] 점성학 운행 API (NEW!)
+app.post('/api/astrology/transit', async (req, res) => {
+    try {
+        const { rawData, transitType } = req.body;
+        
+        const transitPrompts = {
+            monthly: {
+                title: '이번 달 행성 운행',
+                maxLength: 700,
+                instruction: '이번 달(2026년 2월)의 주요 행성 운행과 그것이 사용자에게 미치는 영향을 700자 이내로 설명하세요.'
+            },
+            yearly: {
+                title: '올해 행성 운행',
+                maxLength: 1500,
+                instruction: '2026년 한 해 동안의 주요 행성 운행(목성, 토성, 천왕성 등)과 그 영향을 1500자 이내로 상세히 설명하세요.'
+            },
+            decade: {
+                title: '10년 행성 운행',
+                maxLength: 4000,
+                instruction: '2026-2036년 10년간의 외행성(목성, 토성, 천왕성, 해왕성, 명왕성) 운행과 각 시기별 주요 영향을 4000자 이내로 깊이 있게 분석하세요.'
+            }
+        };
+
+        const config = transitPrompts[transitType];
+        if (!config) {
+            return res.json({ success: false, error: '올바른 운행 타입이 아닙니다.' });
+        }
+
+        const prompt = `
+${BASE_INSTRUCTION}
+[점성학 ${config.title} 분석]
+- 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
+- 출생 정보: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime}
+- 출생지: ${rawData.userInfo.location}
+
+${config.instruction}
+
+답변은 반드시 ${config.maxLength}자를 초과하지 않도록 작성하세요.
+`;
+
+        const transit = await callGeminiAPI(prompt);
+        res.json({ 
+            success: true, 
+            transit: transit,
+            transitType: config.title
+        });
+
+    } catch (error) {
+        console.error("❌ [Transit Error]", error);
+        res.json({ 
+            success: false, 
+            error: '행성 운행 분석 중 오류가 발생했습니다.' 
+        });
+    }
+});
+
+// [5-8] 점성학 채팅 API
+app.post('/api/astrology/chat', async (req, res) => {
+    try {
+        const { userMessage, rawData } = req.body;
+        
+        const prompt = `
+${BASE_INSTRUCTION}
+[상황: 점성학 상세 상담 채팅]
+- 사용자: ${rawData.userInfo.name}
+- 출생 정보: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime}
+- 질문: "${userMessage}"
+
+점성학적 관점에서 답변하되, 결론부터 말하고 이유를 설명하세요.
+`;
+        const answer = await callGeminiAPI(prompt);
+        res.json({ success: true, answer });
+    } catch (e) {
+        res.status(500).json({ success: false, error: 'Chat Error' });
+    }
+});
 app.post('/api/saju/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
