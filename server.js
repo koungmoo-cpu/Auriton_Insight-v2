@@ -100,15 +100,26 @@ function calculateSajuText(userInfo) {
 
         const year = parseInt(p[0]), month = parseInt(p[1]), day = parseInt(p[2]);
         
-        console.log(`📅 Parsing: ${year}년 ${month}월 ${day}일 (${userInfo.calendarType})`);
+        console.log(`📅 입력 데이터:`, JSON.stringify(userInfo, null, 2));
+        console.log(`📅 파싱 결과: ${year}년 ${month}월 ${day}일 (${userInfo.calendarType})`);
+        console.log(`🕐 시간 원본: "${userInfo.birthTime}"`);
         
         let hour = 0;
-        if (userInfo.birthTime && SAJU_TIME_MAP[userInfo.birthTime] !== undefined) {
-            hour = SAJU_TIME_MAP[userInfo.birthTime];
+        if (userInfo.birthTime && userInfo.birthTime !== 'unknown') {
+            if (SAJU_TIME_MAP[userInfo.birthTime] !== undefined) {
+                // 한글 시간 (자시, 축시 등)
+                hour = SAJU_TIME_MAP[userInfo.birthTime];
+            } else {
+                // 숫자 형식 (00:30, 16:30 등)
+                const timeMatch = userInfo.birthTime.match(/\d+/g);
+                hour = timeMatch ? parseInt(timeMatch[0]) : 0;
+            }
         } else {
-            const timeMatch = (userInfo.birthTime || "").match(/\d+/g);
-            hour = timeMatch ? parseInt(timeMatch[0]) : 0;
+            // 시간 모름 → 12시(낮)로 기본 설정
+            hour = 12;
         }
+        
+        console.log(`🕐 최종 시간: ${hour}시`);
 
         let eightChar;
         const calType = userInfo.calendarType || 'solar';
