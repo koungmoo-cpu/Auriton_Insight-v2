@@ -1,25 +1,13 @@
 {
   "name": "auriton-insight-ai",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "type": "module",
-  "description": "AI-powered fortune telling with validated Saju and Western Astrology calculations",
+  "description": "AI-powered fortune telling with premium UI",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "NODE_ENV=development node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "NODE_ENV=development node server.js"
   },
-  "keywords": [
-    "fortune-telling",
-    "saju",
-    "astrology",
-    "ai",
-    "gemini",
-    "bazi",
-    "korean-fortune"
-  ],
-  "author": "Auriton Team",
-  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
@@ -30,7 +18,6 @@
     "dotenv": "^16.3.1"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=18.0.0"
   }
 }

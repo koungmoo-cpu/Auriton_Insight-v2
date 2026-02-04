@@ -1,63 +1,149 @@
 /* ============================================
-   Enhanced Client-side Logic: script.js
-   Features: Question Counter, Session Management
+   Auriton InsightAI - Script
    ============================================ */
 
-// 전역 변수 설정
-window.currentMode = '';
-window.currentUserInfo = {};
-window.questionCount = 0;
-window.maxQuestions = 5;
-window.userId = 'user_' + Date.now(); // 간단한 세션 ID
+// Global Variables
+let currentMode = '';
+let currentUserInfo = {};
+let currentRawData = {};
 
-// 1. 화면 전환 함수
-window.selectMethod = function(method) {
-    console.log("Method Selected:", method);
-    window.currentMode = method;
+// ========== Canvas Network Animation ==========
+function initNetworkCanvas() {
+    const canvas = document.getElementById('network-canvas');
+    if (!canvas) return;
     
-    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles = [];
+    const particleCount = 80;
+    
+    class Particle {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.vx = (Math.random() - 0.5) * 0.5;
+            this.vy = (Math.random() - 0.5) * 0.5;
+            this.radius = Math.random() * 2 + 1;
+        }
+        
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            
+            if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+            if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+        }
+        
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(176, 38, 255, 0.5)';
+            ctx.fill();
+        }
+    }
+    
+    for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+    }
+    
+    function connectParticles() {
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 150) {
+                    ctx.beginPath();
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.strokeStyle = `rgba(0, 212, 255, ${(150 - distance) / 150 * 0.3})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+    
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        particles.forEach(particle => {
+            particle.update();
+            particle.draw();
+        });
+        
+        connectParticles();
+        requestAnimationFrame(animate);
+    }
+    
+    animate();
+    
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    });
+}
+
+// ========== Navigation ==========
+function showSection(section) {
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(s => s.classList.remove('active'));
+    
+    if (section === 'selection') {
+        document.getElementById('selection-screen').classList.add('active');
+    }
+    
+    // Update nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.onclick && item.onclick.toString().includes(section)) {
+            item.classList.add('active');
+        }
+    });
+}
+
+function selectMethod(method) {
+    currentMode = method;
+    
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(s => s.classList.remove('active'));
     
     if (method === 'saju') {
-        const sajuScreen = document.getElementById('saju-screen');
-        if(sajuScreen) sajuScreen.classList.add('active');
+        document.getElementById('saju-screen').classList.add('active');
     } else if (method === 'astrology') {
-        const astroScreen = document.getElementById('astrology-screen');
-        if(astroScreen) astroScreen.classList.add('active');
+        document.getElementById('astrology-screen').classList.add('active');
     }
 }
 
-window.backToSelection = async function() {
-    // 세션 리셋
-    await fetch('/api/reset-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: window.userId })
-    });
+function backToSelection() {
+    currentMode = '';
+    currentUserInfo = {};
+    currentRawData = {};
     
-    window.questionCount = 0;
-    updateQuestionCounter();
-    
-    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(s => s.classList.remove('active'));
     document.getElementById('selection-screen').classList.add('active');
     
+    // Clear chat
     const chatBox = document.getElementById('chat-box');
-    if(chatBox) chatBox.innerHTML = '';
+    if (chatBox) chatBox.innerHTML = '';
 }
 
-window.showResultScreen = function() {
-    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+function showResultScreen() {
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(s => s.classList.remove('active'));
     document.getElementById('result-screen').classList.add('active');
-    
-    // 질문 카운터 초기화
-    window.questionCount = 0;
-    updateQuestionCounter();
 }
 
-// 2. 성별 버튼 선택 로직
-function setupGenderButtons(groupId) {
+// ========== Form Helpers ==========
+function setupOptionButtons(groupId) {
     const group = document.getElementById(groupId);
-    if(!group) return;
-    const buttons = group.querySelectorAll('.option-button');
+    if (!group) return;
+    
+    const buttons = group.querySelectorAll('.gender-btn, .calendar-btn');
     buttons.forEach(btn => {
         btn.addEventListener('click', () => {
             buttons.forEach(b => b.classList.remove('active'));
@@ -66,72 +152,65 @@ function setupGenderButtons(groupId) {
     });
 }
 
-// 3. 질문 카운터 업데이트
-function updateQuestionCounter() {
-    const counter = document.getElementById('question-counter');
-    if (counter) {
-        const remaining = window.maxQuestions - window.questionCount;
-        counter.textContent = `남은 질문: ${remaining}회`;
-        counter.style.color = remaining <= 2 ? '#ff3333' : '#00F0FF';
-    }
+function populateDateSelects() {
+    const targets = [
+        { y: 'saju-year', m: 'saju-month', d: 'saju-day' },
+        { y: 'astro-year', m: 'astro-month', d: 'astro-day' }
+    ];
     
-    // 입력창 비활성화
-    const input = document.getElementById('user-input');
-    const sendBtn = document.getElementById('send-btn');
-    if (window.questionCount >= window.maxQuestions) {
-        if (input) {
-            input.disabled = true;
-            input.placeholder = '추가 질문 횟수가 소진되었습니다';
+    targets.forEach(target => {
+        const ySelect = document.getElementById(target.y);
+        const mSelect = document.getElementById(target.m);
+        const dSelect = document.getElementById(target.d);
+        
+        if (ySelect) {
+            const currentYear = new Date().getFullYear();
+            for (let i = currentYear; i >= 1920; i--) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = i + '년';
+                ySelect.appendChild(opt);
+            }
         }
-        if (sendBtn) sendBtn.disabled = true;
-    } else {
-        if (input) {
-            input.disabled = false;
-            input.placeholder = '추가 질문을 입력하세요...';
+        
+        if (mSelect) {
+            for (let i = 1; i <= 12; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = i + '월';
+                mSelect.appendChild(opt);
+            }
         }
-        if (sendBtn) sendBtn.disabled = false;
-    }
+        
+        if (dSelect) {
+            for (let i = 1; i <= 31; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = i + '일';
+                dSelect.appendChild(opt);
+            }
+        }
+    });
 }
 
-// 4. 메시지 추가 함수
-function appendMessage(sender, text, isTyping = false) {
+// ========== Chat Functions ==========
+function appendMessage(sender, text) {
     const chatBox = document.getElementById('chat-box');
     if (!chatBox) return;
     
     const msgDiv = document.createElement('div');
     msgDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
-    
-    if (isTyping && sender === 'ai') {
-        // 타이핑 효과
-        msgDiv.classList.add('typing-cursor');
-        chatBox.appendChild(msgDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        
-        let index = 0;
-        const interval = setInterval(() => {
-            if (index < text.length) {
-                msgDiv.textContent = text.substring(0, index + 1);
-                index++;
-                chatBox.scrollTop = chatBox.scrollHeight;
-            } else {
-                msgDiv.classList.remove('typing-cursor');
-                clearInterval(interval);
-            }
-        }, 20);
-    } else {
-        msgDiv.textContent = text;
-        chatBox.appendChild(msgDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
+    msgDiv.innerHTML = text.replace(/\n/g, '<br>');
+    chatBox.appendChild(msgDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// 5. API 호출 함수
 async function callApi(endpoint, data) {
     try {
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...data, userId: window.userId })
+            body: JSON.stringify(data)
         });
         return await response.json();
     } catch (error) {
@@ -140,192 +219,165 @@ async function callApi(endpoint, data) {
     }
 }
 
-// 6. 입력 검증 함수
-function validateDate(dateStr) {
-    const match = dateStr.match(/(\d{4})[.-]?(\d{1,2})[.-]?(\d{1,2})/);
-    if (!match) return false;
+// ========== Astrology Calculation ==========
+function calculateAstrology(year, month, day) {
+    // Simple zodiac calculation
+    const zodiacDates = [
+        { sign: '양자리', start: [3, 21], end: [4, 19] },
+        { sign: '황소자리', start: [4, 20], end: [5, 20] },
+        { sign: '쌍둥이자리', start: [5, 21], end: [6, 21] },
+        { sign: '게자리', start: [6, 22], end: [7, 22] },
+        { sign: '사자자리', start: [7, 23], end: [8, 22] },
+        { sign: '처녀자리', start: [8, 23], end: [9, 22] },
+        { sign: '천칭자리', start: [9, 23], end: [10, 22] },
+        { sign: '전갈자리', start: [10, 23], end: [11, 21] },
+        { sign: '사수자리', start: [11, 22], end: [12, 21] },
+        { sign: '염소자리', start: [12, 22], end: [1, 19] },
+        { sign: '물병자리', start: [1, 20], end: [2, 18] },
+        { sign: '물고기자리', start: [2, 19], end: [3, 20] }
+    ];
     
-    const year = parseInt(match[1]);
-    const month = parseInt(match[2]);
-    const day = parseInt(match[3]);
+    let sunSign = '물고기자리';
+    for (const z of zodiacDates) {
+        if ((month === z.start[0] && day >= z.start[1]) || 
+            (month === z.end[0] && day <= z.end[1])) {
+            sunSign = z.sign;
+            break;
+        }
+    }
     
-    if (year < 1900 || year > 2100) return false;
-    if (month < 1 || month > 12) return false;
-    if (day < 1 || day > 31) return false;
-    
-    return true;
+    return {
+        sunSign: sunSign,
+        year: year,
+        month: month,
+        day: day
+    };
 }
 
-// 7. 초기화
+// ========== Init ==========
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Enhanced Script Loaded");
-
-    setupGenderButtons('saju-gender-group');
-    setupGenderButtons('astro-gender-group');
-
-    // 질문 카운터 UI 추가
-    const chatInputArea = document.querySelector('.chat-input-area');
-    if (chatInputArea) {
-        const counterDiv = document.createElement('div');
-        counterDiv.id = 'question-counter';
-        counterDiv.style.cssText = 'color: #00F0FF; font-size: 0.9rem; margin-bottom: 0.5rem; text-align: right; font-family: Orbitron, sans-serif;';
-        counterDiv.textContent = '남은 질문: 5회';
-        chatInputArea.parentElement.insertBefore(counterDiv, chatInputArea);
-    }
-
-    // 사주 폼 제출
+    console.log('Auriton InsightAI Loaded');
+    
+    // Initialize canvas animation
+    initNetworkCanvas();
+    
+    // Setup forms
+    setupOptionButtons('saju-gender-group');
+    setupOptionButtons('saju-calendar-group');
+    setupOptionButtons('astro-gender-group');
+    populateDateSelects();
+    
+    // Saju Form Submit
     const sajuForm = document.getElementById('saju-form');
     if (sajuForm) {
         sajuForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const name = document.getElementById('saju-name').value.trim();
+            if (!document.getElementById('saju-privacy').checked) {
+                alert('개인정보 처리 방침에 동의해주세요.');
+                return;
+            }
+            
+            const name = document.getElementById('saju-name').value;
             const genderBtn = document.querySelector('#saju-gender-group .active');
-            const gender = genderBtn ? genderBtn.dataset.value : 'unknown';
-            const date = document.getElementById('saju-date').value;
-            const time = document.getElementById('saju-time').value;
-            const calendarType = document.querySelector('input[name="calendar"]:checked')?.value || '양력';
-
-            // 입력 검증
-            if (!name) {
-                alert('이름을 입력해주세요.');
-                return;
-            }
-            if (!validateDate(date)) {
-                alert('올바른 날짜 형식이 아닙니다. (예: 1990-01-01)');
-                return;
-            }
-
-            window.currentUserInfo = { 
-                name, 
-                gender, 
-                birthDate: date,
-                birthTime: time || '12:00',
-                calendarType
+            const gender = genderBtn ? genderBtn.dataset.value : 'male';
+            const calendarBtn = document.querySelector('#saju-calendar-group .active');
+            const calendarType = calendarBtn && calendarBtn.dataset.value === 'lunar' ? '음력' : '양력';
+            
+            const year = document.getElementById('saju-year').value;
+            const month = document.getElementById('saju-month').value;
+            const day = document.getElementById('saju-day').value;
+            const time = document.getElementById('saju-time').value || '12:00';
+            
+            currentUserInfo = {
+                name,
+                gender: gender === 'male' ? '남성' : '여성',
+                birthDate: `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`,
+                birthTime: time,
+                calendarType: calendarType
             };
             
-            window.showResultScreen();
-            appendMessage('ai', '사주 명식을 계산하고 있습니다...', false);
-
+            showResultScreen();
+            appendMessage('ai', `분석을 시작합니다... [${calendarType}] ${year}년 ${month}월 ${day}일 정보를 분석 중입니다.`);
+            
             const res = await callApi('/api/saju/consultation', { 
-                rawData: { userInfo: window.currentUserInfo } 
+                rawData: { userInfo: currentUserInfo } 
             });
             
-            // 기존 메시지 제거
-            const chatBox = document.getElementById('chat-box');
-            if (chatBox) chatBox.innerHTML = '';
-            
-            if (res.success) {
-                appendMessage('ai', res.consultation, true);
-            } else {
-                appendMessage('ai', '오류가 발생했습니다: ' + (res.error || '알 수 없는 오류'), false);
-            }
+            appendMessage('ai', res.success ? res.consultation : '오류 발생: ' + res.error);
         });
     }
-
-    // 점성술 폼 제출
+    
+    // Astrology Form Submit
     const astroForm = document.getElementById('astro-form');
     if (astroForm) {
         astroForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const name = document.getElementById('astro-name').value.trim();
+            if (!document.getElementById('astro-privacy').checked) {
+                alert('개인정보 처리 방침에 동의해주세요.');
+                return;
+            }
+            
+            const name = document.getElementById('astro-name').value;
             const genderBtn = document.querySelector('#astro-gender-group .active');
-            const gender = genderBtn ? genderBtn.dataset.value : 'unknown';
-            const date = document.getElementById('astro-date').value;
+            const gender = genderBtn ? genderBtn.dataset.value : 'male';
+            
+            const year = parseInt(document.getElementById('astro-year').value);
+            const month = parseInt(document.getElementById('astro-month').value);
+            const day = parseInt(document.getElementById('astro-day').value);
             const time = document.getElementById('astro-time').value || '12:00';
-
-            if (!name) {
-                alert('이름을 입력해주세요.');
-                return;
-            }
-            if (!validateDate(date)) {
-                alert('올바른 날짜 형식이 아닙니다. (예: 1990-01-01)');
-                return;
-            }
-
-            window.currentUserInfo = { 
-                name, 
-                gender, 
-                birthDate: date,
-                birthTime: time
+            const location = document.getElementById('astro-location').value || '서울, 대한민국';
+            
+            const fMonth = month.toString().padStart(2, '0');
+            const fDay = day.toString().padStart(2, '0');
+            
+            currentUserInfo = {
+                name,
+                gender: gender === 'male' ? '남성' : '여성',
+                birthDate: `${year}-${fMonth}-${fDay}`,
+                birthTime: time,
+                location: location
             };
             
-            window.showResultScreen();
-            appendMessage('ai', '별들의 위치를 계산하고 있습니다...', false);
-
-            const res = await callApi('/api/astrology/consultation', { 
-                rawData: { userInfo: window.currentUserInfo } 
+            const astroResult = calculateAstrology(year, month, day);
+            currentRawData = { userInfo: currentUserInfo, astrology: astroResult };
+            
+            showResultScreen();
+            appendMessage('ai', '별들의 위치를 계산 중입니다. 출생지 정보를 연동합니다...');
+            
+            const res = await callApi('/api/astrology/consultation', { rawData: currentRawData });
+            appendMessage('ai', res.success ? res.consultation : '오류: ' + res.error);
+        });
+    }
+    
+    // Chat Send Button
+    const sendBtn = document.getElementById('send-btn');
+    if (sendBtn) {
+        sendBtn.addEventListener('click', async () => {
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            appendMessage('user', message);
+            input.value = '';
+            
+            const endpoint = currentMode === 'saju' ? '/api/saju/chat' : '/api/astrology/chat';
+            const res = await callApi(endpoint, { 
+                userMessage: message, 
+                rawData: currentRawData 
             });
             
-            const chatBox = document.getElementById('chat-box');
-            if (chatBox) chatBox.innerHTML = '';
-            
-            if (res.success) {
-                appendMessage('ai', res.consultation, true);
-            } else {
-                appendMessage('ai', '오류가 발생했습니다: ' + (res.error || '알 수 없는 오류'), false);
-            }
+            appendMessage('ai', res.success ? res.answer : '응답 실패');
         });
     }
-
-    // 채팅 전송
-    const sendBtn = document.getElementById('send-btn');
+    
+    // Enter key for chat
     const userInput = document.getElementById('user-input');
-    
-    async function sendMessage() {
-        const message = userInput.value.trim();
-        if (!message) return;
-        
-        if (window.questionCount >= window.maxQuestions) {
-            appendMessage('ai', '추가 질문은 5회까지만 가능합니다. 새로운 상담을 시작해주세요.', false);
-            return;
-        }
-
-        appendMessage('user', message, false);
-        userInput.value = '';
-
-        const endpoint = window.currentMode === 'saju' ? '/api/saju/chat' : '/api/astrology/chat';
-        
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'ai-message typing-cursor';
-        loadingDiv.textContent = '분석 중...';
-        loadingDiv.id = 'loading-msg';
-        document.getElementById('chat-box').appendChild(loadingDiv);
-        document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
-
-        const res = await callApi(endpoint, { 
-            userMessage: message, 
-            rawData: { userInfo: window.currentUserInfo } 
-        });
-
-        const loadingMsg = document.getElementById('loading-msg');
-        if(loadingMsg) loadingMsg.remove();
-
-        if (res.success) {
-            window.questionCount++;
-            updateQuestionCounter();
-            appendMessage('ai', res.answer, true);
-            
-            if (res.remainingQuestions !== undefined && res.remainingQuestions === 0) {
-                setTimeout(() => {
-                    appendMessage('ai', '모든 추가 질문이 소진되었습니다. 새로운 상담을 원하시면 "새로운 분석" 버튼을 눌러주세요.', false);
-                }, 1000);
-            }
-        } else {
-            appendMessage('ai', '죄송합니다. 응답을 받아오지 못했습니다.', false);
-        }
-    }
-    
-    if (sendBtn) {
-        sendBtn.addEventListener('click', sendMessage);
-    }
-    
     if (userInput) {
         userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
+            if (e.key === 'Enter') {
+                document.getElementById('send-btn').click();
             }
         });
     }
