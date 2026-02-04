@@ -368,7 +368,11 @@
     const gender = document.querySelector('#saju-gender-group .active').dataset.value;
     
     // ⭐ 중요: 음력/양력 상태 가져오기
-    const calendarType = document.querySelector('#saju-calendar-group .active').dataset.value === 'lunar' ? '음력' : '양력';
+    const calendarBtn = document.querySelector('#saju-calendar-group .active');
+    const calendarValue = calendarBtn ? calendarBtn.dataset.value : 'solar';
+    let calendarType = '양력';
+    if (calendarValue === 'lunar') calendarType = '음력';
+    else if (calendarValue === 'lunar-leap') calendarType = '음력-윤달';
     
     const y = document.getElementById('saju-year').value;
     const m = document.getElementById('saju-month').value;
@@ -379,7 +383,7 @@
     currentUserInfo = { 
         name, 
         gender: gender === 'male' ? '남성' : '여성', 
-        birthDate: `${y}-${m}-${d}`, 
+        birthDate: `${y}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`, 
         birthTime: time, // 이제 "16:30" 같은 값이 들어감
         calendarType: calendarType 
     };

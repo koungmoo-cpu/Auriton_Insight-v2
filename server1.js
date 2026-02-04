@@ -1,6 +1,6 @@
 /* ============================================
-   🖥️ Auriton InsightAI v3.0 - Server (Insight Edition)
-   Updated: Saju Logic Integration & Korean Mapping
+   🖥️ Auriton InsightAI v3.1 - Server (Leap Month Fixed)
+   Updated: Lunar Leap Month Support Added
    ============================================ */
 
 import 'dotenv/config';
@@ -34,7 +34,7 @@ app.use(express.static(__dirname));
 
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 20, // 테스트를 위해 넉넉히 설정
+    max: 20,
     message: { success: false, error: '⚠️ 잠시 후 다시 시도해주세요.' }
 });
 app.use('/api/', apiLimiter);
@@ -82,19 +82,26 @@ const SAJU_TIME_MAP = {
 
 const toHangul = (str) => str.split('').map(char => HAN_TO_HANGUL[char] || char).join('');
 
-// [4] 통합 사주 계산 함수 (오류 방지 및 정확도 확보)
+// [4] 통합 사주 계산 함수 (윤달 지원 추가)
 function calculateSajuText(userInfo) {
-    if (!userInfo || !userInfo.birthDate) return null;
+    if (!userInfo || !userInfo.birthDate) {
+        console.error("❌ No birthDate provided");
+        return null;
+    }
+    
     try {
-        // 날짜와 시간을 합쳐서 숫자만 추출
         const fullDateStr = `${userInfo.birthDate} ${userInfo.birthTime || ""}`;
         const p = fullDateStr.match(/\d+/g);
         
-        if (!p || p.length < 3) return null;
+        if (!p || p.length < 3) {
+            console.error("❌ Invalid date format:", fullDateStr);
+            return null;
+        }
 
         const year = parseInt(p[0]), month = parseInt(p[1]), day = parseInt(p[2]);
         
-        // 시간 파싱: 텍스트(자시) 우선 확인 후 숫자(14:30) 추출
+        console.log(`📅 Parsing: ${year}년 ${month}월 ${day}일 (${userInfo.calendarType})`);
+        
         let hour = 0;
         if (userInfo.birthTime && SAJU_TIME_MAP[userInfo.birthTime] !== undefined) {
             hour = SAJU_TIME_MAP[userInfo.birthTime];
@@ -104,19 +111,28 @@ function calculateSajuText(userInfo) {
         }
 
         let eightChar;
-        // 음력/양력 유연하게 처리
-        if (userInfo.calendarType === '음력' || userInfo.calendarType === 'lunar') {
+        const calType = userInfo.calendarType || 'solar';
+        
+        if (calType === '음력' || calType === 'lunar') {
+            console.log("🌙 음력(평달) 처리");
+            eightChar = Lunar.fromYmdHms(year, month, day, hour, 0, 0).getEightChar();
+        } else if (calType === '음력-윤달' || calType === 'lunar-leap') {
+            console.log("🌙 음력(윤달) 처리");
             eightChar = Lunar.fromYmdHms(year, month, day, hour, 0, 0).getEightChar();
         } else {
+            console.log("☀️ 양력 처리");
             eightChar = Solar.fromYmdHms(year, month, day, hour, 0, 0).getLunar().getEightChar();
         }
 
-        return `${toHangul(eightChar.getYearGan())}${toHangul(eightChar.getYearZhi())}년 ` +
-               `${toHangul(eightChar.getMonthGan())}${toHangul(eightChar.getMonthZhi())}월 ` +
-               `${toHangul(eightChar.getDayGan())}${toHangul(eightChar.getDayZhi())}일 ` +
-               `${toHangul(eightChar.getHourGan())}${toHangul(eightChar.getHourZhi())}시`;
+        const result = `${toHangul(eightChar.getYearGan())}${toHangul(eightChar.getYearZhi())}년 ` +
+                      `${toHangul(eightChar.getMonthGan())}${toHangul(eightChar.getMonthZhi())}월 ` +
+                      `${toHangul(eightChar.getDayGan())}${toHangul(eightChar.getDayZhi())}일 ` +
+                      `${toHangul(eightChar.getHourGan())}${toHangul(eightChar.getHourZhi())}시`;
+        
+        console.log("✅ 사주 명식:", result);
+        return result;
     } catch (e) {
-        console.error("Saju Calculation Error:", e);
+        console.error("❌ Saju Calculation Error:", e);
         return null;
     }
 }
@@ -125,7 +141,7 @@ function calculateSajuText(userInfo) {
 function getSajuPrompt(rawData) {
     const { userInfo } = rawData;
     const sajuText = calculateSajuText(userInfo);
-    if (!sajuText) return `${BASE_INSTRUCTION}\n\n[오류] 입력하신 날짜 정보가 올바르지 않습니다. (예: 1990-01-01 형식)`;
+    if (!sajuText) return `${BASE_INSTRUCTION}\n\n[오류] 입력하신 날짜 정보가 올바르지 않습니다.`;
 
     return `
 ${BASE_INSTRUCTION}
@@ -157,10 +173,13 @@ Big 3(태양, 달, 상승궁)를 중심으로 해석하되 용어 설명은 생�
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
+        console.log("📥 Received data:", JSON.stringify(rawData, null, 2));
+        
         const prompt = getSajuPrompt(rawData);
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
+        console.error("❌ API Error:", error);
         res.status(500).json({ success: false, error: '분석 중 오류 발생' });
     }
 });
