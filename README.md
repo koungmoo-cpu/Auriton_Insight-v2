@@ -69,15 +69,34 @@ project/
 
 ## 🌐 배포
 
-### Vercel
+### Vercel 배포 (단계별)
+
+**1. 환경 변수 설정 (매우 중요!)**
+```
+Vercel Dashboard → Your Project → Settings → Environment Variables
+```
+
+추가할 환경 변수:
+```
+GEMINI_API_KEY = your_actual_api_key_here
+NODE_ENV = production
+```
+
+**2. 배포 명령어**
 ```bash
 vercel
 ```
 
-환경 변수 설정:
-1. Vercel Dashboard → Settings
-2. Environment Variables
-3. GEMINI_API_KEY 추가
+**3. 배포 후 로그 확인**
+```bash
+vercel logs
+```
+
+### ⚠️ 배포 시 주의사항
+
+1. **환경 변수가 설정되지 않으면 사주 계산 실패**
+2. Vercel은 Serverless Function으로 동작하므로 로컬과 다를 수 있음
+3. 로그는 Vercel Dashboard에서 실시간 확인 가능
 
 ## 🐛 트러블슈팅
 

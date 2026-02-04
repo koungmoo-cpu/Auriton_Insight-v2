@@ -84,8 +84,16 @@ const toHangul = (str) => str.split('').map(char => HAN_TO_HANGUL[char] || char)
 
 // [4] 통합 사주 계산 함수 (윤달 지원 추가)
 function calculateSajuText(userInfo) {
-    if (!userInfo || !userInfo.birthDate) {
-        console.error("❌ No birthDate provided");
+    console.log("🔍 [calculateSajuText] 시작");
+    console.log("🔍 [calculateSajuText] userInfo:", JSON.stringify(userInfo));
+    
+    if (!userInfo) {
+        console.error("❌ [calculateSajuText] userInfo is null/undefined");
+        return null;
+    }
+    
+    if (!userInfo.birthDate) {
+        console.error("❌ [calculateSajuText] No birthDate in userInfo");
         return null;
     }
     
@@ -184,14 +192,33 @@ Big 3(태양, 달, 상승궁)를 중심으로 해석하되 용어 설명은 생�
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        console.log("📥 Received data:", JSON.stringify(rawData, null, 2));
+        console.log("📥 [Saju] Received data:", JSON.stringify(rawData, null, 2));
+        
+        if (!rawData || !rawData.userInfo) {
+            console.error("❌ [Saju] No userInfo in rawData");
+            return res.status(400).json({ 
+                success: false, 
+                error: '데이터 형식 오류: userInfo가 없습니다.' 
+            });
+        }
+        
+        const sajuText = calculateSajuText(rawData.userInfo);
+        if (!sajuText) {
+            console.error("❌ [Saju] calculateSajuText returned null");
+            console.error("❌ [Saju] userInfo was:", JSON.stringify(rawData.userInfo));
+            return res.json({ 
+                success: true, 
+                consultation: '죄송합니다. 입력하신 날짜 정보가 올바르지 않아 정확한 분석을 제공해 드릴 수 없습니다. 다시 한번 정확한 생년월일시를 확인해 주시면, 당신의 별자리를 깊이 있게 통찰하여 당신만의 고유한 이야기를 들려드리겠습니다. 당신의 내면을 비추는 등불이 되어 드리겠습니다.' 
+            });
+        }
         
         const prompt = getSajuPrompt(rawData);
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
-        console.error("❌ API Error:", error);
-        res.status(500).json({ success: false, error: '분석 중 오류 발생' });
+        console.error("❌ [Saju] API Error:", error);
+        console.error("❌ [Saju] Stack:", error.stack);
+        res.status(500).json({ success: false, error: '분석 중 오류 발생: ' + error.message });
     }
 });
 
