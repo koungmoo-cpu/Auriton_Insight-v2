@@ -76,7 +76,7 @@
                 <h3>운명 궁합</h3>
                 <p style="font-size:0.8rem; color:#888; margin-top:10px">두 사람의 에너지 조화와<br>관계 발전 조언</p>
             </div>
-            <div class="method-card" onclick="alert('준비 중입니다.')" style="--color:var(--primary-cyan); --glow:rgba(0,242,255,0.3)">
+            <div class="method-card" onclick="goAstrology()" style="--color:var(--primary-cyan); --glow:rgba(0,242,255,0.3)">
                 <span class="icon">🌌</span>
                 <h3>서양 점성술</h3>
                 <p style="font-size:0.8rem; color:#888; margin-top:10px">별들의 배치로 보는<br>내면의 심리 분석</p>
@@ -143,6 +143,44 @@
         </div>
     </section>
 
+    <!-- 점성학 화면 추가 -->
+    <section id="screen-astrology" class="screen">
+        <button onclick="goHome()" style="color:#666; background:none; border:none; margin-bottom:10px">◀ BACK</button>
+        <div class="form-box" style="--theme:var(--primary-cyan)">
+            <h2 style="color:white; margin-bottom:20px; font-family:'Orbitron'">⭐ ASTROLOGY DATA</h2>
+            <form id="form-astrology" onsubmit="submitAstrology(event)">
+                <div class="input-group">
+                    <label class="label">NAME</label>
+                    <input type="text" id="a-name" class="input" placeholder="이름" required>
+                </div>
+                <div class="input-group">
+                    <label class="label">GENDER</label>
+                    <div class="btn-group" id="a-gender-box">
+                        <div class="opt-btn active" data-val="male">남성</div>
+                        <div class="opt-btn" data-val="female">여성</div>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label class="label">BIRTH DATE</label>
+                    <div style="display:flex; gap:5px">
+                        <input type="number" id="a-y" class="input" placeholder="Year" style="flex:2" required>
+                        <input type="number" id="a-m" class="input" placeholder="Month" style="flex:1" required>
+                        <input type="number" id="a-d" class="input" placeholder="Day" style="flex:1" required>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label class="label">BIRTH TIME</label>
+                    <input type="time" id="a-time" class="input" required>
+                </div>
+                <div class="input-group">
+                    <label class="label">BIRTH LOCATION</label>
+                    <input type="text" id="a-location" class="input" placeholder="예: 서울, 대한민국" value="서울, 대한민국">
+                </div>
+                <button type="submit" class="action-btn" style="background:var(--primary-cyan); color:white">ANALYZE STARS ✨</button>
+            </form>
+        </div>
+    </section>
+
     <section id="screen-result" class="screen">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
             <h2 class="header-sub" style="margin:0; text-align:left">ANALYSIS RESULT</h2>
@@ -173,6 +211,22 @@
                 </button>
             </div>
         </div>
+
+        <!-- Astrology Transit Buttons (점성학 분석 후에만 표시) -->
+        <div id="astrology-buttons" style="display:none; margin-bottom:20px; background:rgba(15,30,45,0.6); padding:15px; border-radius:8px; border:1px solid rgba(0,242,255,0.3)">
+            <div style="text-align:center; color:#00f2ff; font-size:0.8rem; margin-bottom:12px; font-family:'Orbitron'">🌟 행성 운행 흐름</div>
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px">
+                <button class="astrology-btn" data-transit="monthly" style="padding:10px; background:linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    월 흐름
+                </button>
+                <button class="astrology-btn" data-transit="yearly" style="padding:10px; background:linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    년 흐름
+                </button>
+                <button class="astrology-btn" data-transit="decade" style="padding:10px; background:linear-gradient(135deg, #fa709a 0%, #fee140 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
+                    10년 흐름
+                </button>
+            </div>
+        </div>
         
         <div class="chat-container">
             <div id="chat-box" class="chat-box"></div>
@@ -199,12 +253,14 @@
             showScreen('screen-select'); 
             document.getElementById('chat-box').innerHTML = ''; // 채팅 초기화
             document.getElementById('fortune-buttons').style.display = 'none'; // 운세 버튼 숨김
+            document.getElementById('astrology-buttons').style.display = 'none'; // 점성학 버튼 숨김
             currentUserInfo = null; // 데이터 초기화
             currentCoupleInfo = null;
             currentMode = '';
         }
         function goSaju() { currentMode = 'saju'; showScreen('screen-saju'); }
         function goCouple() { currentMode = 'couple'; showScreen('screen-couple'); }
+        function goAstrology() { currentMode = 'astrology'; showScreen('screen-astrology'); }
 
         // --- UI Helpers ---
         document.querySelectorAll('.btn-group .opt-btn').forEach(btn => {
@@ -311,7 +367,48 @@
             } catch(err) { appendMsg('ai', "분석 중 오류가 발생했습니다."); }
         }
 
-        // 3. 채팅 전송 (여기가 핵심!)
+        // 3. 점성학 분석
+        async function submitAstrology(e) {
+            e.preventDefault();
+            const name = document.getElementById('a-name').value;
+            const gender = document.querySelector('#a-gender-box .active').dataset.val;
+            const y = document.getElementById('a-y').value;
+            const m = document.getElementById('a-m').value;
+            const d = document.getElementById('a-d').value;
+            const t = document.getElementById('a-time').value;
+            const location = document.getElementById('a-location').value;
+
+            // 전역 변수에 저장
+            currentUserInfo = { 
+                name, 
+                gender, 
+                birthDate: `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`, 
+                birthTime: t, 
+                location: location 
+            };
+            
+            // 점성학 모드 설정
+            currentMode = "astrology";
+            
+            showScreen('screen-result');
+            document.getElementById('chat-input-area').style.display = 'flex';
+            
+            // ✨ 점성학 버튼 표시
+            document.getElementById('astrology-buttons').style.display = 'block';
+            
+            appendMsg('ai', "🌌 별들의 위치를 분석하고 있습니다...\n(행성 배치 계산 중)");
+
+            try {
+                const res = await fetch('/api/astrology/consultation', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ rawData: { userInfo: currentUserInfo } })
+                });
+                const data = await res.json();
+                appendMsg('ai', data.consultation);
+            } catch(err) { appendMsg('ai', "서버 통신 오류가 발생했습니다."); }
+        }
+
+        // 4. 채팅 전송 (여기가 핵심!)
         async function sendChat() {
             const input = document.getElementById('user-msg');
             const msg = input.value.trim();
@@ -322,9 +419,10 @@
             input.value = '';
 
             // 서버로 전송 (currentUserInfo를 같이 보냅니다!)
-            if (currentMode === 'saju' && currentUserInfo) {
+            if ((currentMode === 'saju' || currentMode === 'astrology') && currentUserInfo) {
                 try {
-                    const res = await fetch('/api/saju/chat', {
+                    const endpoint = currentMode === 'saju' ? '/api/saju/chat' : '/api/astrology/chat';
+                    const res = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
@@ -382,13 +480,70 @@
             }
         }
 
+        // ========== Astrology Transit Functions ==========
+        async function showAstrologyTransit(transitType) {
+            if (!currentUserInfo) {
+                appendMsg('ai', '먼저 점성학 분석을 완료해주세요.');
+                return;
+            }
+
+            const transitNames = {
+                'monthly': '이번 달 행성 운행',
+                'yearly': '올해 행성 운행',
+                'decade': '10년 행성 운행'
+            };
+
+            appendMsg('ai', `🌟 ${transitNames[transitType]} 분석 중입니다... 잠시만 기다려주세요.`);
+            
+            try {
+                const res = await fetch('/api/astrology/transit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        rawData: { userInfo: currentUserInfo },
+                        transitType: transitType
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    appendMsg('ai', `🌟 **${data.transitType}**\n\n${data.transit}`);
+                } else {
+                    appendMsg('ai', `오류 발생: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Transit API Error:', error);
+                appendMsg('ai', '행성 운행 분석 중 오류가 발생했습니다.');
+            }
+        }
+
         // 운세 버튼 이벤트 리스너 등록
         document.addEventListener('DOMContentLoaded', function() {
+            // 사주 운세 버튼
             const fortuneBtns = document.querySelectorAll('.fortune-btn');
             fortuneBtns.forEach(btn => {
                 btn.addEventListener('click', function() {
                     const fortuneType = this.dataset.fortune;
                     showFortuneByType(fortuneType);
+                });
+                
+                // 호버 효과
+                btn.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-2px)';
+                    this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                });
+                btn.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                    this.style.boxShadow = 'none';
+                });
+            });
+
+            // 점성학 운행 버튼
+            const astrologyBtns = document.querySelectorAll('.astrology-btn');
+            astrologyBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const transitType = this.dataset.transit;
+                    showAstrologyTransit(transitType);
                 });
                 
                 // 호버 효과

@@ -118,7 +118,12 @@
     <section id="screen-couple" class="screen">
         <button onclick="goHome()" style="color:#666; background:none; border:none; margin-bottom:10px">◀ BACK</button>
         <div class="form-box" style="--theme:var(--primary-pink)">
-            <h2 style="color:white; margin-bottom:20px; font-family:'Orbitron'">COUPLE DATA</h2>
+            <h2 style="color:white; margin-bottom:10px; font-family:'Orbitron'">💞 COUPLE DATA</h2>
+            <div style="background:rgba(255,0,85,0.1); padding:10px; border-radius:6px; margin-bottom:20px; border-left:3px solid var(--primary-pink)">
+                <p style="color:#ff88aa; font-size:0.85rem; margin:0">
+                    ⚠️ 궁합 분석은 <strong style="color:#fff">양력 기준</strong>으로만 계산됩니다.
+                </p>
+            </div>
             
             <div class="tabs">
                 <div class="tab active" onclick="switchTab('A')">Person A (나)</div>
@@ -126,18 +131,32 @@
             </div>
 
             <div id="tab-A" class="tab-content active">
-                <div class="input-group"><label class="label">NAME</label><input type="text" id="c-name-a" class="input" placeholder="내 이름"></div>
+                <div class="input-group"><label class="label">NAME</label><input type="text" id="c-name-a" class="input" placeholder="내 이름" required></div>
                 <div class="input-group"><label class="label">GENDER</label><select id="c-gender-a" class="select"><option value="male">남성</option><option value="female">여성</option></select></div>
-                <div class="input-group"><label class="label">DATE</label><div style="display:flex; gap:5px"><input type="number" id="c-y-a" class="input" placeholder="YYYY"><input type="number" id="c-m-a" class="input" placeholder="MM"><input type="number" id="c-d-a" class="input" placeholder="DD"></div></div>
-                <div class="input-group"><label class="label">TIME</label><input type="time" id="c-time-a" class="input"></div>
+                <div class="input-group">
+                    <label class="label">BIRTH DATE (양력)</label>
+                    <div style="display:flex; gap:5px">
+                        <input type="number" id="c-y-a" class="input" placeholder="YYYY" min="1900" max="2100" required>
+                        <input type="number" id="c-m-a" class="input" placeholder="MM" min="1" max="12" required>
+                        <input type="number" id="c-d-a" class="input" placeholder="DD" min="1" max="31" required>
+                    </div>
+                </div>
+                <div class="input-group"><label class="label">BIRTH TIME (선택)</label><input type="time" id="c-time-a" class="input" placeholder="모르면 비워두세요"></div>
                 <div class="action-btn" onclick="switchTab('B')" style="background:#333; color:#fff; text-align:center; margin-top:20px">NEXT: 상대방 입력 ▶</div>
             </div>
 
             <div id="tab-B" class="tab-content">
-                <div class="input-group"><label class="label">NAME</label><input type="text" id="c-name-b" class="input" placeholder="상대방 이름"></div>
+                <div class="input-group"><label class="label">NAME</label><input type="text" id="c-name-b" class="input" placeholder="상대방 이름" required></div>
                 <div class="input-group"><label class="label">GENDER</label><select id="c-gender-b" class="select"><option value="female" selected>여성</option><option value="male">남성</option></select></div>
-                <div class="input-group"><label class="label">DATE</label><div style="display:flex; gap:5px"><input type="number" id="c-y-b" class="input" placeholder="YYYY"><input type="number" id="c-m-b" class="input" placeholder="MM"><input type="number" id="c-d-b" class="input" placeholder="DD"></div></div>
-                <div class="input-group"><label class="label">TIME</label><input type="time" id="c-time-b" class="input"></div>
+                <div class="input-group">
+                    <label class="label">BIRTH DATE (양력)</label>
+                    <div style="display:flex; gap:5px">
+                        <input type="number" id="c-y-b" class="input" placeholder="YYYY" min="1900" max="2100" required>
+                        <input type="number" id="c-m-b" class="input" placeholder="MM" min="1" max="12" required>
+                        <input type="number" id="c-d-b" class="input" placeholder="DD" min="1" max="31" required>
+                    </div>
+                </div>
+                <div class="input-group"><label class="label">BIRTH TIME (선택)</label><input type="time" id="c-time-b" class="input" placeholder="모르면 비워두세요"></div>
                 <button onclick="submitCouple()" class="action-btn" style="background:var(--primary-pink); color:white; margin-top:20px">CHECK COMPATIBILITY ❤</button>
             </div>
         </div>
@@ -328,43 +347,67 @@
             } catch(err) { appendMsg('ai', "서버 통신 오류가 발생했습니다."); }
         }
 
-        // 2. 궁합 분석
+        // 2. 궁합 분석 (양력 고정)
         async function submitCouple() {
+            // 날짜 값 가져오기
+            const aY = document.getElementById('c-y-a').value;
+            const aM = document.getElementById('c-m-a').value;
+            const aD = document.getElementById('c-d-a').value;
+            const bY = document.getElementById('c-y-b').value;
+            const bM = document.getElementById('c-m-b').value;
+            const bD = document.getElementById('c-d-b').value;
+
+            // 날짜 형식 검증
+            if (!aY || !aM || !aD || !bY || !bM || !bD) {
+                alert("두 사람의 생년월일을 모두 입력해주세요."); 
+                return;
+            }
+
             const aInfo = {
                 name: document.getElementById('c-name-a').value,
                 gender: document.getElementById('c-gender-a').value,
-                birthDate: `${document.getElementById('c-y-a').value}-${document.getElementById('c-m-a').value}-${document.getElementById('c-d-a').value}`,
-                birthTime: document.getElementById('c-time-a').value,
-                calendarType: 'solar'
+                birthDate: `${aY}-${String(aM).padStart(2, '0')}-${String(aD).padStart(2, '0')}`,
+                birthTime: document.getElementById('c-time-a').value || '12:00',
+                calendarType: '양력' // 양력으로 고정
             };
             const bInfo = {
                 name: document.getElementById('c-name-b').value,
                 gender: document.getElementById('c-gender-b').value,
-                birthDate: `${document.getElementById('c-y-b').value}-${document.getElementById('c-m-b').value}-${document.getElementById('c-d-b').value}`,
-                birthTime: document.getElementById('c-time-b').value,
-                calendarType: 'solar'
+                birthDate: `${bY}-${String(bM).padStart(2, '0')}-${String(bD).padStart(2, '0')}`,
+                birthTime: document.getElementById('c-time-b').value || '12:00',
+                calendarType: '양력' // 양력으로 고정
             };
 
-            if(!aInfo.name || !bInfo.name || aInfo.birthDate.length < 8 || bInfo.birthDate.length < 8) {
-                alert("두 사람의 정보를 모두 입력해주세요."); return;
+            if(!aInfo.name || !bInfo.name) {
+                alert("두 사람의 이름을 모두 입력해주세요."); 
+                return;
             }
 
             // 궁합 모드
             currentCoupleInfo = { personA: aInfo, personB: bInfo };
+            currentMode = 'couple';
             showScreen('screen-result');
             // 궁합 채팅은 복잡도가 높아 일단 숨김 (필요시 활성화 가능)
             document.getElementById('chat-input-area').style.display = 'none';
 
-            appendMsg('ai', "💞 두 사람의 에너지를 동기화하여 분석 중입니다...");
+            appendMsg('ai', "💞 두 사람의 에너지를 동기화하여 분석 중입니다...\n(양력 기준으로 사주 계산 중)");
 
             try {
-                const res = await fetch('/api/saju/compatibility', {
+                const res = await fetch('/api/compatibility', {
                     method: 'POST', headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ personA: aInfo, personB: bInfo })
+                    body: JSON.stringify({ person1: aInfo, person2: bInfo })
                 });
                 const data = await res.json();
-                appendMsg('ai', data.consultation);
-            } catch(err) { appendMsg('ai', "분석 중 오류가 발생했습니다."); }
+                
+                if (data.success) {
+                    appendMsg('ai', data.analysis);
+                } else {
+                    appendMsg('ai', `❌ 오류 발생: ${data.error}\n\n입력하신 정보를 확인해주세요.`);
+                }
+            } catch(err) { 
+                console.error('Compatibility Error:', err);
+                appendMsg('ai', "❌ 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."); 
+            }
         }
 
         // 3. 점성학 분석
