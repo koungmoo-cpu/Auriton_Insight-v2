@@ -105,14 +105,16 @@ function calculateSajuText(userInfo) {
         console.log(`📅 Parsed: ${year}-${month}-${day} ${hour}:00, Type: ${userInfo.calendarType}`);
 
         let eightChar;
-        const calType = userInfo.calendarType || 'solar';
+        const calType = (userInfo.calendarType || 'solar').toLowerCase();
 
-        if (calType.includes('음력') || calType.includes('lunar')) {
+        // 음력 판단: 'lunar', '음력', '음력(윤)' 포함 시
+        if (calType.includes('lunar') || calType.includes('음력')) {
             console.log("🌙 Processing Lunar Date...");
             const lunarObj = Lunar.fromYmdHms(year, month, day, hour, 0, 0);
             if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
             eightChar = lunarObj.getEightChar();
         } else {
+            // 그 외 모든 경우 양력으로 처리 ('solar', '양력', 기타)
             console.log("☀️ Processing Solar Date...");
             const solarObj = Solar.fromYmdHms(year, month, day, hour, 0, 0);
             if (!solarObj) throw new Error("양력 날짜 객체 생성 실패");
@@ -146,6 +148,10 @@ app.post('/api/compatibility', async (req, res) => {
     try {
         const { person1, person2 } = req.body;
         
+        console.log("💞 [Compatibility Request]");
+        console.log("Person 1:", JSON.stringify(person1));
+        console.log("Person 2:", JSON.stringify(person2));
+        
         if (!person1 || !person2) {
             return res.json({ 
                 success: false, 
@@ -153,32 +159,44 @@ app.post('/api/compatibility', async (req, res) => {
             });
         }
 
+        console.log("🔮 Calculating Saju for Person 1...");
         const saju1 = calculateSajuText(person1);
+        console.log("✅ Person 1 Saju:", saju1);
+        
+        console.log("🔮 Calculating Saju for Person 2...");
         const saju2 = calculateSajuText(person2);
+        console.log("✅ Person 2 Saju:", saju2);
         
         if (saju1.startsWith('ERROR:') || saju2.startsWith('ERROR:')) {
+            const errorMsg = saju1.startsWith('ERROR:') ? saju1 : saju2;
+            console.error("❌ Saju Calculation Failed:", errorMsg);
             return res.json({ 
                 success: false, 
-                error: '궁합 계산 중 오류가 발생했습니다. 입력 정보를 확인해주세요.' 
+                error: `궁합 계산 중 오류가 발생했습니다.\n\n${errorMsg.replace('ERROR: ', '')}\n\n입력 정보를 다시 확인해주세요.` 
             });
         }
 
+        console.log("🤖 Generating AI Analysis...");
         const prompt = `
 ${BASE_INSTRUCTION}
 [궁합 분석]
-- 첫 번째 사람: ${person1.name} - ${saju1}
-- 두 번째 사람: ${person2.name} - ${saju2}
+- 첫 번째 사람: ${person1.name} (${person1.gender}) - ${saju1}
+- 두 번째 사람: ${person2.name} (${person2.gender}) - ${saju2}
 
 두 사람의 사주 궁합을 음양오행 관점에서 분석하고, 관계 발전을 위한 조언을 해주세요.
+1. 음양오행 조화도
+2. 상생상극 관계
+3. 관계 발전을 위한 구체적 조언
 `;
         const result = await callGeminiAPI(prompt);
+        console.log("✅ Analysis Complete");
         res.json({ success: true, analysis: result });
         
     } catch (error) {
         console.error("❌ [Compatibility Error]", error);
         res.json({ 
             success: false, 
-            error: '궁합 분석 중 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' 
+            error: `궁합 분석 중 시스템 오류가 발생했습니다.\n\n오류 내용: ${error.message}\n\n잠시 후 다시 시도해주세요.` 
         });
     }
 });
