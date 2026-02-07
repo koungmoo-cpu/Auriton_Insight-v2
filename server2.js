@@ -66,36 +66,6 @@ async function callGeminiAPI(prompt) {
 // [3] 안전한 한글 매핑 로직
 const BASE_INSTRUCTION = `
 당신은 고대의 지혜와 미래의 AI가 결합된 'Auriton InsightAI'의 마스터입니다.
-
-**📅 현재 시점 정보 (절대 틀리지 마세요!)**
-- 오늘 날짜: 2026년 2월 7일 (토요일)
-- 올해: 2026년 = 병오년(丙午年) = 붉은 말의 해
-- 간지: 병오(丙午)
-  * 병(丙): 天干 3번째, 火(화), 붉은색, 양간
-  * 오(午): 地支 7번째, 火(화), 말(馬), 남방, 여름
-- 오행: 火火 → 火 기운이 매우 강함
-- 특징: 열정, 역동성, 빠른 변화, 추진력, 도전
-
-**🔥 2026년 병오년의 에너지:**
-- 火 기운 극대화: 열정적이고 활발한 한 해
-- 말의 속성: 빠름, 자유, 진취적
-- 붉은 색: 강렬함, 생명력, 변화
-- 주의: 성급함, 과열 주의
-
-**📆 주변 연도 참고 (절대 혼동하지 마세요):**
-- 2023년 = 계묘년 (검은 토끼) - 이미 지남
-- 2024년 = 갑진년 (푸른 용) - 이미 지남
-- 2025년 = 을사년 (푸른 뱀) - 작년
-- 2026년 = 병오년 (붉은 말) ← ★ 올해 ★
-- 2027년 = 정미년 (붉은 양) - 내년
-- 2028년 = 무신년 (누런 원숭이)
-
-**🚨 절대 규칙:**
-1. "올해"는 항상 2026년, 병오년, 붉은 말의 해입니다
-2. 2026년을 다른 연도(계묘년, 갑진년, 을사년 등)로 절대 착각하지 마세요
-3. 연도를 언급할 때는 반드시 위 정보를 참고하세요
-4. 10년 운세 등에서 연도를 나열할 때도 위 정보 기준으로 정확히 계산하세요
-
 모든 답변은 한국어 경어체(해요체)로 작성하세요.
 절대로 뻔한 이론적인 설명은 하지 말고, 사용자에 대한 통찰과 해석을 제공하세요.
 `;
@@ -322,27 +292,27 @@ app.post('/api/saju/fortune', async (req, res) => {
             daily: {
                 title: '오늘의 운세',
                 maxLength: 700,
-                instruction: '2026년 2월 7일(병오년) 오늘 하루의 에너지 흐름과 주의사항을 700자 이내로 간결하게 설명하세요.'
+                instruction: '오늘 하루의 에너지 흐름과 주의사항을 700자 이내로 간결하게 설명하세요.'
             },
             weekly: {
                 title: '이번 주 운세',
                 maxLength: 700,
-                instruction: '2026년 2월 이번 주의 전반적인 흐름과 중요 포인트를 700자 이내로 설명하세요.'
+                instruction: '이번 주의 전반적인 흐름과 중요 포인트를 700자 이내로 설명하세요.'
             },
             monthly: {
                 title: '이번 달 운세',
                 maxLength: 700,
-                instruction: '2026년 2월(병오년) 이번 달의 운세와 집중해야 할 영역을 700자 이내로 설명하세요.'
+                instruction: '이번 달의 운세와 집중해야 할 영역을 700자 이내로 설명하세요.'
             },
             yearly: {
                 title: '올해의 운세',
                 maxLength: 1500,
-                instruction: '2026년 병오년(붉은 말의 해) 전체의 큰 흐름, 기회와 도전을 1500자 이내로 상세히 설명하세요. 병오년의 火火 에너지가 사용자에게 미치는 영향을 중심으로 분석하세요.'
+                instruction: '올해 전체의 큰 흐름, 기회와 도전을 1500자 이내로 상세히 설명하세요.'
             },
             decade: {
                 title: '10년 운세',
                 maxLength: 4000,
-                instruction: '2026년(병오년)부터 2036년까지 향후 10년간의 대운 흐름과 각 시기별 특징을 4000자 이내로 깊이 있게 분석하세요. 각 연도의 간지를 정확히 계산하여 언급하세요.'
+                instruction: '향후 10년간의 대운 흐름과 각 시기별 특징을 4000자 이내로 깊이 있게 분석하세요.'
             },
             total: {
                 title: '총운',
@@ -358,9 +328,6 @@ app.post('/api/saju/fortune', async (req, res) => {
 
         const prompt = `
 ${BASE_INSTRUCTION}
-
-**재확인: 오늘은 2026년 2월 7일, 병오년(붉은 말의 해)입니다**
-
 [${config.title} 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
 - 사주 명식: ${sajuText}
@@ -408,9 +375,6 @@ app.post('/api/saju/consultation', async (req, res) => {
 
         const prompt = `
 ${BASE_INSTRUCTION}
-
-**재확인: 오늘은 2026년 2월 7일, 병오년(붉은 말의 해)입니다**
-
 [분석 데이터]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
 - 확정 사주 명식: ${sajuText}${timeWarning}
@@ -419,8 +383,7 @@ ${BASE_INSTRUCTION}
 
 1. **핵심 본성 (일간 분석)**: 이 사람이 어떤 기질을 타고났는지 비유를 들어 설명하세요.
 2. **에너지의 균형**: 강한 기운과 부족한 기운이 삶에 미치는 영향을 분석하세요.
-3. **2026년 병오년의 영향**: 올해 火火 에너지가 이 사람에게 미치는 영향을 분석하세요.
-4. **현대적 개운법**: 구체적인 색상, 행동 지침을 제안하세요.
+3. **현대적 개운법**: 구체적인 색상, 행동 지침을 제안하세요.
 `;
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
@@ -457,9 +420,6 @@ app.post('/api/astrology/consultation', async (req, res) => {
         
         const prompt = `
 ${BASE_INSTRUCTION}
-
-**참고: 오늘은 2026년 2월 7일입니다**
-
 [점성학 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
 - 생년월일: ${solarDate} ${rawData.userInfo.birthTime}${dateInfo}
@@ -561,9 +521,6 @@ app.post('/api/astrology/chat', async (req, res) => {
         
         const prompt = `
 ${BASE_INSTRUCTION}
-
-**참고: 오늘은 2026년 2월 7일입니다**
-
 [상황: 점성학 상세 상담 채팅]
 - 사용자: ${rawData.userInfo.name}
 - 출생 정보 (양력): ${solarDate} ${rawData.userInfo.birthTime}
@@ -589,9 +546,6 @@ app.post('/api/saju/chat', async (req, res) => {
 
         const prompt = `
 ${BASE_INSTRUCTION}
-
-**재확인: 오늘은 2026년 2월 7일, 병오년(붉은 말의 해)입니다**
-
 [상황: 사주 상세 상담 채팅]
 - 사용자: ${rawData.userInfo.name}
 - **확정 사주 명식: ${sajuText}**
@@ -600,7 +554,6 @@ ${BASE_INSTRUCTION}
 🚨 **작성 지침:**
 1. 위 '확정 사주 명식'을 근거로 일관성 있게 답변하세요.
 2. 결론부터 말하고 사주적 이유를 설명하세요.
-3. 연도를 언급할 때는 2026년=병오년임을 명심하세요.
 `;
         const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
