@@ -80,6 +80,69 @@ const toHangul = (str) => {
     return str.split('').map(char => HAN_TO_HANGUL[char] || char).join('');
 };
 
+// [3-2] 음력을 양력으로 변환하는 함수 (점성학용)
+function convertToSolar(userInfo) {
+    console.log("🔄 [Convert to Solar] Input:", JSON.stringify(userInfo));
+    
+    try {
+        if (!userInfo || !userInfo.birthDate) {
+            throw new Error("생년월일 정보가 누락되었습니다.");
+        }
+
+        const parts = userInfo.birthDate.split('-');
+        if (parts.length !== 3) {
+            throw new Error(`날짜 형식이 잘못되었습니다 (${userInfo.birthDate})`);
+        }
+
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+            throw new Error("날짜에 숫자가 아닌 값이 포함되어 있습니다.");
+        }
+
+        const calType = (userInfo.calendarType || 'solar').toLowerCase();
+
+        // 음력이면 양력으로 변환
+        if (calType.includes('lunar') || calType.includes('음력')) {
+            const isLeapMonth = calType.includes('윤') || calType.includes('leap');
+            console.log(`🌙→☀️ Converting Lunar to Solar... ${isLeapMonth ? '(윤달)' : '(평달)'}`);
+            
+            try {
+                const lunarObj = Lunar.fromYmdHms(year, month, day, 12, 0, 0, isLeapMonth ? 1 : 0);
+                if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
+                
+                const solarObj = lunarObj.getSolar();
+                const solarYear = solarObj.getYear();
+                const solarMonth = solarObj.getMonth();
+                const solarDay = solarObj.getDay();
+                
+                console.log(`✅ Converted: ${year}-${month}-${day} (음력) → ${solarYear}-${solarMonth}-${solarDay} (양력)`);
+                
+                return {
+                    birthDate: `${solarYear}-${String(solarMonth).padStart(2, '0')}-${String(solarDay).padStart(2, '0')}`,
+                    originalDate: userInfo.birthDate,
+                    originalCalendar: userInfo.calendarType,
+                    converted: true
+                };
+            } catch (e) {
+                throw new Error(`음력→양력 변환 실패: ${e.message}`);
+            }
+        } else {
+            // 이미 양력이면 그대로 반환
+            console.log("☀️ Already Solar, no conversion needed");
+            return {
+                birthDate: userInfo.birthDate,
+                converted: false
+            };
+        }
+    } catch (e) {
+        console.error("❌ [Conversion Error]:", e.message);
+        throw e;
+    }
+}
+
 // [4] 사주 계산 함수
 function calculateSajuText(userInfo) {
     console.log("🔍 [Calc Start] Input Data:", JSON.stringify(userInfo));
@@ -306,11 +369,15 @@ app.post('/api/saju/consultation', async (req, res) => {
             });
         }
 
+        const timeWarning = rawData.userInfo.timeUnknown 
+            ? '\n\n⚠️ **시간 정보 없음**: 시주(時柱)는 정오(12:00) 기준으로 참고만 하세요. 일주까지의 분석이 더 정확합니다.' 
+            : '';
+
         const prompt = `
 ${BASE_INSTRUCTION}
 [분석 데이터]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
-- 확정 사주 명식: ${sajuText}
+- 확정 사주 명식: ${sajuText}${timeWarning}
 
 **🚨 중요: 반드시 답변의 맨 첫 줄에 "사주 명식: ${sajuText}"를 출력한 후 해설을 시작하세요.**
 
@@ -332,29 +399,48 @@ app.post('/api/astrology/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
         
-        const calendarInfo = rawData.userInfo.calendarType 
-            ? `(${rawData.userInfo.calendarType} 기준)` 
+        console.log("⭐ [Astrology Request] Original Data:", JSON.stringify(rawData.userInfo));
+        
+        // 음력이면 양력으로 변환
+        const conversionResult = convertToSolar(rawData.userInfo);
+        const solarDate = conversionResult.birthDate;
+        
+        let dateInfo = '';
+        if (conversionResult.converted) {
+            dateInfo = `\n- 원본 입력: ${conversionResult.originalDate} (${conversionResult.originalCalendar})\n- 변환된 양력: ${solarDate}`;
+            console.log(`✅ Converted for Astrology: ${conversionResult.originalDate} → ${solarDate}`);
+        } else {
+            dateInfo = `\n- 양력: ${solarDate}`;
+            console.log(`✅ Using Solar Date: ${solarDate}`);
+        }
+
+        const timeWarning = rawData.userInfo.timeUnknown 
+            ? '\n\n⚠️ **시간 정보 없음**: 상승궁(ASC)은 정오(12:00) 기준이므로 정확하지 않을 수 있습니다. 태양, 달, 행성 배치 분석에 집중하세요.' 
             : '';
         
         const prompt = `
 ${BASE_INSTRUCTION}
 [점성학 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
-- 생년월일: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime} ${calendarInfo}
-- 출생지: ${rawData.userInfo.location}
+- 생년월일: ${solarDate} ${rawData.userInfo.birthTime}${dateInfo}
+- 출생지: ${rawData.userInfo.location}${timeWarning}
 
 서양 점성학 관점에서 이 사람의:
 1. **Big 3 (태양/달/상승궁)**: 핵심 성격과 내면
 2. **주요 행성 배치**: 금성, 화성, 수성의 영향
 3. **현재 운행 흐름**: 2026년 주요 행성의 움직임이 미치는 영향
 
+**중요**: 점성학은 양력(태양력) 기반이므로, 위의 양력 날짜를 기준으로 분석하세요.
 용어 설명은 최소화하고 실질적인 통찰을 제공하세요.
 `;
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
     } catch (error) {
         console.error("❌ [Astrology Error]", error);
-        res.json({ success: false, consultation: '점성학 분석 중 오류 발생.' });
+        res.json({ 
+            success: false, 
+            consultation: `점성학 분석 중 오류 발생.\n\n${error.message}` 
+        });
     }
 });
 
@@ -386,15 +472,25 @@ app.post('/api/astrology/transit', async (req, res) => {
             return res.json({ success: false, error: '올바른 운행 타입이 아닙니다.' });
         }
 
+        // 음력이면 양력으로 변환
+        const conversionResult = convertToSolar(rawData.userInfo);
+        const solarDate = conversionResult.birthDate;
+        
+        let dateInfo = '';
+        if (conversionResult.converted) {
+            dateInfo = ` (원본: ${conversionResult.originalDate} ${conversionResult.originalCalendar} → 변환: ${solarDate} 양력)`;
+        }
+
         const prompt = `
 ${BASE_INSTRUCTION}
 [점성학 ${config.title} 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
-- 출생 정보: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime}
+- 출생 정보: ${solarDate} ${rawData.userInfo.birthTime}${dateInfo}
 - 출생지: ${rawData.userInfo.location}
 
 ${config.instruction}
 
+**중요**: 점성학은 양력 기반이므로 위의 양력 날짜로 분석하세요.
 답변은 반드시 ${config.maxLength}자를 초과하지 않도록 작성하세요.
 `;
 
@@ -419,14 +515,19 @@ app.post('/api/astrology/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
         
+        // 음력이면 양력으로 변환
+        const conversionResult = convertToSolar(rawData.userInfo);
+        const solarDate = conversionResult.birthDate;
+        
         const prompt = `
 ${BASE_INSTRUCTION}
 [상황: 점성학 상세 상담 채팅]
 - 사용자: ${rawData.userInfo.name}
-- 출생 정보: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime}
+- 출생 정보 (양력): ${solarDate} ${rawData.userInfo.birthTime}
 - 질문: "${userMessage}"
 
 점성학적 관점에서 답변하되, 결론부터 말하고 이유를 설명하세요.
+**중요**: 점성학은 양력 기반이므로 위의 양력 날짜로 분석하세요.
 `;
         const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });

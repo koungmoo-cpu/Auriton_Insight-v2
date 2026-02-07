@@ -100,8 +100,18 @@
                         <input type="number" id="s-d" class="input" placeholder="Day" style="flex:1" required>
                     </div>
                 </div>
-                <div class="input-group"><label class="label">BIRTH TIME</label>
-                    <input type="time" id="s-time" class="input" required>
+                <div class="input-group">
+                    <label class="label">BIRTH TIME</label>
+                    <div style="display:flex; gap:10px; align-items:center">
+                        <input type="time" id="s-time" class="input" style="flex:1">
+                        <label style="display:flex; align-items:center; gap:5px; color:#999; font-size:0.85rem; cursor:pointer; white-space:nowrap">
+                            <input type="checkbox" id="s-time-unknown" onchange="toggleTimeInput('s')" style="cursor:pointer">
+                            시간 모름
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem; color:#888; margin-top:5px; line-height:1.4">
+                        💡 시간을 모르면 기본값(12:00 정오)으로 분석됩니다. 시주(時柱)는 제외되고 일주까지만 분석됩니다.
+                    </p>
                 </div>
                 <div class="input-group">
                     <label class="label">CALENDAR TYPE</label>
@@ -201,7 +211,16 @@
                 </div>
                 <div class="input-group">
                     <label class="label">BIRTH TIME</label>
-                    <input type="time" id="a-time" class="input" required>
+                    <div style="display:flex; gap:10px; align-items:center">
+                        <input type="time" id="a-time" class="input" style="flex:1">
+                        <label style="display:flex; align-items:center; gap:5px; color:#66ddff; font-size:0.85rem; cursor:pointer; white-space:nowrap">
+                            <input type="checkbox" id="a-time-unknown" onchange="toggleTimeInput('a')" style="cursor:pointer">
+                            시간 모름
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem; color:#66ddff; margin-top:5px; opacity:0.8; line-height:1.4">
+                        💡 시간을 모르면 정오(12:00)로 가정합니다. 상승궁은 정확하지 않을 수 있습니다.
+                    </p>
                 </div>
                 <div class="input-group">
                     <label class="label">BIRTH LOCATION</label>
@@ -351,6 +370,26 @@
             }
         }
         
+        // ========== 시간 입력 토글 ==========
+        function toggleTimeInput(prefix) {
+            const timeInput = document.getElementById(`${prefix}-time`);
+            const checkbox = document.getElementById(`${prefix}-time-unknown`);
+            
+            if (checkbox.checked) {
+                // 시간 모름 체크 시
+                timeInput.value = '12:00';
+                timeInput.disabled = true;
+                timeInput.style.opacity = '0.5';
+                timeInput.style.cursor = 'not-allowed';
+            } else {
+                // 체크 해제 시
+                timeInput.value = '';
+                timeInput.disabled = false;
+                timeInput.style.opacity = '1';
+                timeInput.style.cursor = 'text';
+            }
+        }
+        
         // 전역 변수로 사용자 정보 저장 (이게 있어야 채팅이 됩니다!)
         let currentMode = ''; // 'saju' or 'couple'
         let currentUserInfo = null; // 사주용
@@ -466,7 +505,8 @@
             const y = document.getElementById('s-y').value;
             const m = document.getElementById('s-m').value;
             const d = document.getElementById('s-d').value;
-            const t = document.getElementById('s-time').value;
+            const t = document.getElementById('s-time').value || '12:00'; // 비어있으면 정오
+            const timeUnknown = document.getElementById('s-time-unknown').checked;
 
             // 전역 변수에 저장 (채팅할 때 씁니다!)
             currentUserInfo = { 
@@ -474,7 +514,8 @@
                 gender, 
                 birthDate: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, 
                 birthTime: t, 
-                calendarType: calendarType 
+                calendarType: calendarType,
+                timeUnknown: timeUnknown
             };
             
             // 사주 모드 설정
@@ -486,7 +527,11 @@
             // ✨ 운세 버튼 표시
             document.getElementById('fortune-buttons').style.display = 'block';
             
-            appendMsg('ai', "🔮 운명의 데이터를 분석하고 있습니다...\n(대운 흐름 계산 중)");
+            let loadingMsg = "🔮 운명의 데이터를 분석하고 있습니다...\n(대운 흐름 계산 중)";
+            if (timeUnknown) {
+                loadingMsg += "\n\n⚠️ 시간 정보가 없어 시주(時柱)는 제외되고 일주까지만 분석됩니다.";
+            }
+            appendMsg('ai', loadingMsg);
 
             try {
                 const res = await fetch('/api/saju/consultation', {
@@ -570,8 +615,9 @@
             const y = document.getElementById('a-y').value;
             const m = document.getElementById('a-m').value;
             const d = document.getElementById('a-d').value;
-            const t = document.getElementById('a-time').value;
+            const t = document.getElementById('a-time').value || '12:00'; // 비어있으면 정오
             const location = document.getElementById('a-location').value;
+            const timeUnknown = document.getElementById('a-time-unknown').checked;
 
             // 전역 변수에 저장
             currentUserInfo = { 
@@ -580,7 +626,8 @@
                 birthDate: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, 
                 birthTime: t, 
                 location: location,
-                calendarType: calendarType // 달력 타입 추가
+                calendarType: calendarType,
+                timeUnknown: timeUnknown
             };
             
             // 점성학 모드 설정
@@ -592,7 +639,11 @@
             // ✨ 점성학 버튼 표시
             document.getElementById('astrology-buttons').style.display = 'block';
             
-            appendMsg('ai', `🌌 별들의 위치를 분석하고 있습니다...\n(${calendarType} 기준, 행성 배치 계산 중)`);
+            let loadingMsg = `🌌 별들의 위치를 분석하고 있습니다...\n(${calendarType} 기준, 행성 배치 계산 중)`;
+            if (timeUnknown) {
+                loadingMsg += "\n\n⚠️ 시간 정보가 없어 상승궁(ASC)이 정확하지 않을 수 있습니다.";
+            }
+            appendMsg('ai', loadingMsg);
 
             try {
                 const res = await fetch('/api/astrology/consultation', {

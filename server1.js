@@ -109,16 +109,26 @@ function calculateSajuText(userInfo) {
 
         // 음력 판단: 'lunar', '음력', '음력(윤)' 포함 시
         if (calType.includes('lunar') || calType.includes('음력')) {
-            console.log("🌙 Processing Lunar Date...");
-            const lunarObj = Lunar.fromYmdHms(year, month, day, hour, 0, 0);
-            if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
-            eightChar = lunarObj.getEightChar();
+            const isLeapMonth = calType.includes('윤') || calType.includes('leap');
+            console.log(`🌙 Processing Lunar Date... ${isLeapMonth ? '(윤달)' : '(평달)'}`);
+            
+            try {
+                const lunarObj = Lunar.fromYmdHms(year, month, day, hour, 0, 0, isLeapMonth ? 1 : 0);
+                if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
+                eightChar = lunarObj.getEightChar();
+            } catch (e) {
+                throw new Error(`음력 날짜 처리 실패: ${e.message}`);
+            }
         } else {
             // 그 외 모든 경우 양력으로 처리 ('solar', '양력', 기타)
             console.log("☀️ Processing Solar Date...");
-            const solarObj = Solar.fromYmdHms(year, month, day, hour, 0, 0);
-            if (!solarObj) throw new Error("양력 날짜 객체 생성 실패");
-            eightChar = solarObj.getLunar().getEightChar();
+            try {
+                const solarObj = Solar.fromYmdHms(year, month, day, hour, 0, 0);
+                if (!solarObj) throw new Error("양력 날짜 객체 생성 실패");
+                eightChar = solarObj.getLunar().getEightChar();
+            } catch (e) {
+                throw new Error(`양력 날짜 처리 실패: ${e.message}`);
+            }
         }
 
         const yearGan = toHangul(eightChar.getYearGan());
@@ -322,11 +332,15 @@ app.post('/api/astrology/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
         
+        const calendarInfo = rawData.userInfo.calendarType 
+            ? `(${rawData.userInfo.calendarType} 기준)` 
+            : '';
+        
         const prompt = `
 ${BASE_INSTRUCTION}
 [점성학 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
-- 생년월일: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime}
+- 생년월일: ${rawData.userInfo.birthDate} ${rawData.userInfo.birthTime} ${calendarInfo}
 - 출생지: ${rawData.userInfo.location}
 
 서양 점성학 관점에서 이 사람의:

@@ -103,12 +103,9 @@
                 <div class="input-group"><label class="label">BIRTH TIME</label>
                     <input type="time" id="s-time" class="input" required>
                 </div>
-                <div class="input-group"><label class="label">CALENDAR TYPE</label>
-                    <div class="btn-group" id="s-cal-box">
-                        <div class="opt-btn active" data-val="solar">양력</div>
-                        <div class="opt-btn" data-val="lunar">음력</div>
-                        <div class="opt-btn" data-val="lunar-leap">음력(윤)</div>
-                    </div>
+                <div class="input-group">
+                    <label class="label">CALENDAR TYPE</label>
+                    <div id="s-cal-box"></div>
                 </div>
                 <button type="submit" class="action-btn" style="background:var(--primary-purple); color:white">ANALYZE ▶</button>
             </form>
@@ -121,7 +118,7 @@
             <h2 style="color:white; margin-bottom:10px; font-family:'Orbitron'">💞 COUPLE DATA</h2>
             <div style="background:rgba(255,0,85,0.1); padding:10px; border-radius:6px; margin-bottom:20px; border-left:3px solid var(--primary-pink)">
                 <p style="color:#ff88aa; font-size:0.85rem; margin:0">
-                    ⚠️ 궁합 분석은 <strong style="color:#fff">양력 기준</strong>으로만 계산됩니다.
+                    💡 <strong style="color:#fff">양력/음력 선택 가능</strong> - 두 사람의 달력 타입을 각각 선택하세요.
                 </p>
             </div>
             
@@ -134,12 +131,16 @@
                 <div class="input-group"><label class="label">NAME</label><input type="text" id="c-name-a" class="input" placeholder="내 이름" required></div>
                 <div class="input-group"><label class="label">GENDER</label><select id="c-gender-a" class="select"><option value="male">남성</option><option value="female">여성</option></select></div>
                 <div class="input-group">
-                    <label class="label">BIRTH DATE (양력)</label>
+                    <label class="label">BIRTH DATE</label>
                     <div style="display:flex; gap:5px">
                         <input type="number" id="c-y-a" class="input" placeholder="YYYY" min="1900" max="2100" required>
                         <input type="number" id="c-m-a" class="input" placeholder="MM" min="1" max="12" required>
                         <input type="number" id="c-d-a" class="input" placeholder="DD" min="1" max="31" required>
                     </div>
+                </div>
+                <div class="input-group">
+                    <label class="label">CALENDAR TYPE</label>
+                    <div id="c-cal-a"></div>
                 </div>
                 <div class="input-group"><label class="label">BIRTH TIME (선택)</label><input type="time" id="c-time-a" class="input" placeholder="모르면 비워두세요"></div>
                 <div class="action-btn" onclick="switchTab('B')" style="background:#333; color:#fff; text-align:center; margin-top:20px">NEXT: 상대방 입력 ▶</div>
@@ -149,12 +150,16 @@
                 <div class="input-group"><label class="label">NAME</label><input type="text" id="c-name-b" class="input" placeholder="상대방 이름" required></div>
                 <div class="input-group"><label class="label">GENDER</label><select id="c-gender-b" class="select"><option value="female" selected>여성</option><option value="male">남성</option></select></div>
                 <div class="input-group">
-                    <label class="label">BIRTH DATE (양력)</label>
+                    <label class="label">BIRTH DATE</label>
                     <div style="display:flex; gap:5px">
                         <input type="number" id="c-y-b" class="input" placeholder="YYYY" min="1900" max="2100" required>
                         <input type="number" id="c-m-b" class="input" placeholder="MM" min="1" max="12" required>
                         <input type="number" id="c-d-b" class="input" placeholder="DD" min="1" max="31" required>
                     </div>
+                </div>
+                <div class="input-group">
+                    <label class="label">CALENDAR TYPE</label>
+                    <div id="c-cal-b"></div>
                 </div>
                 <div class="input-group"><label class="label">BIRTH TIME (선택)</label><input type="time" id="c-time-b" class="input" placeholder="모르면 비워두세요"></div>
                 <button onclick="submitCouple()" class="action-btn" style="background:var(--primary-pink); color:white; margin-top:20px">CHECK COMPATIBILITY ❤</button>
@@ -186,6 +191,13 @@
                         <input type="number" id="a-m" class="input" placeholder="Month" style="flex:1" required>
                         <input type="number" id="a-d" class="input" placeholder="Day" style="flex:1" required>
                     </div>
+                </div>
+                <div class="input-group">
+                    <label class="label">CALENDAR TYPE</label>
+                    <div id="a-cal-box"></div>
+                    <p style="font-size:0.75rem; color:#66ddff; margin-top:5px; opacity:0.8">
+                        💡 점성학은 일반적으로 양력을 사용합니다
+                    </p>
                 </div>
                 <div class="input-group">
                     <label class="label">BIRTH TIME</label>
@@ -247,8 +259,36 @@
             </div>
         </div>
         
-        <div class="chat-container">
+        <div class="chat-container" style="position:relative">
             <div id="chat-box" class="chat-box"></div>
+            
+            <!-- 스크롤 컨트롤 버튼 -->
+            <div style="position:absolute; right:15px; bottom:70px; display:flex; flex-direction:column; gap:8px; z-index:10">
+                <!-- 맨 위로 버튼 -->
+                <button id="scroll-to-top-btn" onclick="scrollToTop()" 
+                        style="display:none; opacity:0; width:45px; height:45px; border-radius:50%; 
+                               background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                               border:none; color:white; font-size:1.2rem; cursor:pointer; 
+                               box-shadow:0 4px 12px rgba(0,0,0,0.3); transition:all 0.3s;
+                               display:flex; align-items:center; justify-content:center"
+                        title="맨 위로">
+                    ⬆️
+                </button>
+                
+                <!-- 맨 아래로 버튼 -->
+                <button onclick="scrollToBottom()" 
+                        style="width:45px; height:45px; border-radius:50%; 
+                               background:linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                               border:none; color:white; font-size:1.2rem; cursor:pointer; 
+                               box-shadow:0 4px 12px rgba(0,0,0,0.3); transition:all 0.3s;
+                               display:flex; align-items:center; justify-content:center"
+                        onmouseover="this.style.transform='scale(1.1)'"
+                        onmouseout="this.style.transform='scale(1)'"
+                        title="맨 아래로">
+                    ⬇️
+                </button>
+            </div>
+            
             <div class="chat-input-area" id="chat-input-area">
                 <input type="text" id="user-msg" class="chat-input" placeholder="추가 질문을 입력하세요 (예: 2026년 재물운은?)">
                 <button onclick="sendChat()" class="send-btn">SEND</button>
@@ -258,6 +298,59 @@
     </section>
 
     <script>
+        // ========== 공통 컴포넌트: 달력 타입 선택기 ==========
+        function createCalendarTypeSelector(containerId, defaultType = 'solar', includeLeapMonth = true) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            container.className = 'btn-group calendar-type-selector';
+            
+            const options = [
+                { value: 'solar', label: '양력', emoji: '☀️' },
+                { value: 'lunar', label: '음력', emoji: '🌙' }
+            ];
+            
+            if (includeLeapMonth) {
+                options.push({ value: 'lunar-leap', label: '음력(윤)', emoji: '🌙+' });
+            }
+            
+            container.innerHTML = options.map(opt => `
+                <div class="opt-btn ${opt.value === defaultType ? 'active' : ''}" 
+                     data-val="${opt.value}"
+                     title="${opt.label}">
+                    <span style="font-size:0.9rem; margin-right:4px">${opt.emoji}</span>
+                    ${opt.label}
+                </div>
+            `).join('');
+            
+            // 클릭 이벤트 자동 등록
+            container.querySelectorAll('.opt-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    container.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+        }
+        
+        // ========== 공통: 달력 타입 가져오기 ==========
+        function getCalendarType(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return 'solar';
+            
+            const activeBtn = container.querySelector('.opt-btn.active');
+            if (!activeBtn) return 'solar';
+            
+            const val = activeBtn.dataset.val;
+            
+            // 한글로 변환
+            switch(val) {
+                case 'solar': return '양력';
+                case 'lunar': return '음력';
+                case 'lunar-leap': return '음력(윤)';
+                default: return '양력';
+            }
+        }
+        
         // 전역 변수로 사용자 정보 저장 (이게 있어야 채팅이 됩니다!)
         let currentMode = ''; // 'saju' or 'couple'
         let currentUserInfo = null; // 사주용
@@ -273,6 +366,7 @@
             document.getElementById('chat-box').innerHTML = ''; // 채팅 초기화
             document.getElementById('fortune-buttons').style.display = 'none'; // 운세 버튼 숨김
             document.getElementById('astrology-buttons').style.display = 'none'; // 점성학 버튼 숨김
+            hideScrollToTopButton(); // 스크롤 버튼 숨김
             currentUserInfo = null; // 데이터 초기화
             currentCoupleInfo = null;
             currentMode = '';
@@ -299,6 +393,10 @@
         function appendMsg(sender, text) {
             const box = document.getElementById('chat-box');
             const div = document.createElement('div');
+            
+            // 현재 스크롤 위치 저장
+            const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 100;
+            
             // AI 메시지는 줄바꿈 처리 및 강조 표시
             if (sender === 'ai') {
                 div.className = 'ai-msg';
@@ -308,7 +406,54 @@
                 div.textContent = text;
             }
             box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
+            
+            // 사용자 메시지이거나 이미 맨 아래에 있었으면 스크롤
+            if (sender === 'user' || wasAtBottom) {
+                box.scrollTop = box.scrollHeight;
+            }
+            
+            // AI 응답이 완료되면 "맨 위로" 버튼 표시
+            if (sender === 'ai' && !text.includes('분석 중') && !text.includes('계산 중')) {
+                setTimeout(() => {
+                    showScrollToTopButton();
+                }, 500);
+            }
+        }
+
+        // 맨 위로 스크롤 버튼 표시/숨김
+        function showScrollToTopButton() {
+            const btn = document.getElementById('scroll-to-top-btn');
+            if (btn) {
+                btn.style.display = 'block';
+                setTimeout(() => btn.style.opacity = '1', 10);
+            }
+        }
+
+        function hideScrollToTopButton() {
+            const btn = document.getElementById('scroll-to-top-btn');
+            if (btn) {
+                btn.style.opacity = '0';
+                setTimeout(() => btn.style.display = 'none', 300);
+            }
+        }
+
+        // 채팅 박스를 부드럽게 맨 위로 스크롤
+        function scrollToTop() {
+            const box = document.getElementById('chat-box');
+            box.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+            hideScrollToTopButton();
+        }
+
+        // 채팅 박스를 부드럽게 맨 아래로 스크롤
+        function scrollToBottom() {
+            const box = document.getElementById('chat-box');
+            box.scrollTo({
+                top: box.scrollHeight,
+                behavior: 'smooth'
+            });
         }
 
         // --- API Calls ---
@@ -317,14 +462,20 @@
             e.preventDefault();
             const name = document.getElementById('s-name').value;
             const gender = document.querySelector('#s-gender-box .active').dataset.val;
-            const cal = document.querySelector('#s-cal-box .active').dataset.val;
+            const calendarType = getCalendarType('s-cal-box'); // 공통 함수 사용
             const y = document.getElementById('s-y').value;
             const m = document.getElementById('s-m').value;
             const d = document.getElementById('s-d').value;
             const t = document.getElementById('s-time').value;
 
             // 전역 변수에 저장 (채팅할 때 씁니다!)
-            currentUserInfo = { name, gender, birthDate: `${y}-${m}-${d}`, birthTime: t, calendarType: cal };
+            currentUserInfo = { 
+                name, 
+                gender, 
+                birthDate: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, 
+                birthTime: t, 
+                calendarType: calendarType 
+            };
             
             // 사주 모드 설정
             currentMode = "saju";
@@ -347,7 +498,7 @@
             } catch(err) { appendMsg('ai', "서버 통신 오류가 발생했습니다."); }
         }
 
-        // 2. 궁합 분석 (양력 고정)
+        // 2. 궁합 분석
         async function submitCouple() {
             // 날짜 값 가져오기
             const aY = document.getElementById('c-y-a').value;
@@ -368,14 +519,14 @@
                 gender: document.getElementById('c-gender-a').value,
                 birthDate: `${aY}-${String(aM).padStart(2, '0')}-${String(aD).padStart(2, '0')}`,
                 birthTime: document.getElementById('c-time-a').value || '12:00',
-                calendarType: '양력' // 양력으로 고정
+                calendarType: getCalendarType('c-cal-a') // 공통 함수 사용
             };
             const bInfo = {
                 name: document.getElementById('c-name-b').value,
                 gender: document.getElementById('c-gender-b').value,
                 birthDate: `${bY}-${String(bM).padStart(2, '0')}-${String(bD).padStart(2, '0')}`,
                 birthTime: document.getElementById('c-time-b').value || '12:00',
-                calendarType: '양력' // 양력으로 고정
+                calendarType: getCalendarType('c-cal-b') // 공통 함수 사용
             };
 
             if(!aInfo.name || !bInfo.name) {
@@ -390,7 +541,7 @@
             // 궁합 채팅은 복잡도가 높아 일단 숨김 (필요시 활성화 가능)
             document.getElementById('chat-input-area').style.display = 'none';
 
-            appendMsg('ai', "💞 두 사람의 에너지를 동기화하여 분석 중입니다...\n(양력 기준으로 사주 계산 중)");
+            appendMsg('ai', `💞 두 사람의 에너지를 동기화하여 분석 중입니다...\n(${aInfo.calendarType}/${bInfo.calendarType} 기준으로 사주 계산 중)`);
 
             try {
                 const res = await fetch('/api/compatibility', {
@@ -415,6 +566,7 @@
             e.preventDefault();
             const name = document.getElementById('a-name').value;
             const gender = document.querySelector('#a-gender-box .active').dataset.val;
+            const calendarType = getCalendarType('a-cal-box'); // 공통 함수 사용
             const y = document.getElementById('a-y').value;
             const m = document.getElementById('a-m').value;
             const d = document.getElementById('a-d').value;
@@ -425,9 +577,10 @@
             currentUserInfo = { 
                 name, 
                 gender, 
-                birthDate: `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`, 
+                birthDate: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, 
                 birthTime: t, 
-                location: location 
+                location: location,
+                calendarType: calendarType // 달력 타입 추가
             };
             
             // 점성학 모드 설정
@@ -439,7 +592,7 @@
             // ✨ 점성학 버튼 표시
             document.getElementById('astrology-buttons').style.display = 'block';
             
-            appendMsg('ai', "🌌 별들의 위치를 분석하고 있습니다...\n(행성 배치 계산 중)");
+            appendMsg('ai', `🌌 별들의 위치를 분석하고 있습니다...\n(${calendarType} 기준, 행성 배치 계산 중)`);
 
             try {
                 const res = await fetch('/api/astrology/consultation', {
@@ -562,6 +715,24 @@
 
         // 운세 버튼 이벤트 리스너 등록
         document.addEventListener('DOMContentLoaded', function() {
+            // ========== 달력 선택기 초기화 ==========
+            createCalendarTypeSelector('s-cal-box', 'solar', true);     // 사주: 양력/음력/음력(윤)
+            createCalendarTypeSelector('c-cal-a', 'solar', true);       // 궁합 A: 양력/음력/음력(윤)
+            createCalendarTypeSelector('c-cal-b', 'solar', true);       // 궁합 B: 양력/음력/음력(윤)
+            createCalendarTypeSelector('a-cal-box', 'solar', true);     // 점성학: 양력/음력/음력(윤) (양력 권장)
+            
+            // ========== 채팅 박스 스크롤 감지 ==========
+            const chatBox = document.getElementById('chat-box');
+            chatBox.addEventListener('scroll', function() {
+                const isAtTop = chatBox.scrollTop < 100;
+                const scrollTopBtn = document.getElementById('scroll-to-top-btn');
+                
+                // 맨 위에 있으면 "맨 위로" 버튼 숨김
+                if (isAtTop && scrollTopBtn.style.display === 'block') {
+                    hideScrollToTopButton();
+                }
+            });
+            
             // 사주 운세 버튼
             const fortuneBtns = document.querySelectorAll('.fortune-btn');
             fortuneBtns.forEach(btn => {
