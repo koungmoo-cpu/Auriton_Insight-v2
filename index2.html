@@ -259,36 +259,8 @@
             </div>
         </div>
         
-        <div class="chat-container" style="position:relative">
+        <div class="chat-container">
             <div id="chat-box" class="chat-box"></div>
-            
-            <!-- 스크롤 컨트롤 버튼 -->
-            <div style="position:absolute; right:15px; bottom:70px; display:flex; flex-direction:column; gap:8px; z-index:10">
-                <!-- 맨 위로 버튼 -->
-                <button id="scroll-to-top-btn" onclick="scrollToTop()" 
-                        style="display:none; opacity:0; width:45px; height:45px; border-radius:50%; 
-                               background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                               border:none; color:white; font-size:1.2rem; cursor:pointer; 
-                               box-shadow:0 4px 12px rgba(0,0,0,0.3); transition:all 0.3s;
-                               display:flex; align-items:center; justify-content:center"
-                        title="맨 위로">
-                    ⬆️
-                </button>
-                
-                <!-- 맨 아래로 버튼 -->
-                <button onclick="scrollToBottom()" 
-                        style="width:45px; height:45px; border-radius:50%; 
-                               background:linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
-                               border:none; color:white; font-size:1.2rem; cursor:pointer; 
-                               box-shadow:0 4px 12px rgba(0,0,0,0.3); transition:all 0.3s;
-                               display:flex; align-items:center; justify-content:center"
-                        onmouseover="this.style.transform='scale(1.1)'"
-                        onmouseout="this.style.transform='scale(1)'"
-                        title="맨 아래로">
-                    ⬇️
-                </button>
-            </div>
-            
             <div class="chat-input-area" id="chat-input-area">
                 <input type="text" id="user-msg" class="chat-input" placeholder="추가 질문을 입력하세요 (예: 2026년 재물운은?)">
                 <button onclick="sendChat()" class="send-btn">SEND</button>
@@ -366,7 +338,6 @@
             document.getElementById('chat-box').innerHTML = ''; // 채팅 초기화
             document.getElementById('fortune-buttons').style.display = 'none'; // 운세 버튼 숨김
             document.getElementById('astrology-buttons').style.display = 'none'; // 점성학 버튼 숨김
-            hideScrollToTopButton(); // 스크롤 버튼 숨김
             currentUserInfo = null; // 데이터 초기화
             currentCoupleInfo = null;
             currentMode = '';
@@ -393,10 +364,6 @@
         function appendMsg(sender, text) {
             const box = document.getElementById('chat-box');
             const div = document.createElement('div');
-            
-            // 현재 스크롤 위치 저장
-            const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 100;
-            
             // AI 메시지는 줄바꿈 처리 및 강조 표시
             if (sender === 'ai') {
                 div.className = 'ai-msg';
@@ -406,54 +373,7 @@
                 div.textContent = text;
             }
             box.appendChild(div);
-            
-            // 사용자 메시지이거나 이미 맨 아래에 있었으면 스크롤
-            if (sender === 'user' || wasAtBottom) {
-                box.scrollTop = box.scrollHeight;
-            }
-            
-            // AI 응답이 완료되면 "맨 위로" 버튼 표시
-            if (sender === 'ai' && !text.includes('분석 중') && !text.includes('계산 중')) {
-                setTimeout(() => {
-                    showScrollToTopButton();
-                }, 500);
-            }
-        }
-
-        // 맨 위로 스크롤 버튼 표시/숨김
-        function showScrollToTopButton() {
-            const btn = document.getElementById('scroll-to-top-btn');
-            if (btn) {
-                btn.style.display = 'block';
-                setTimeout(() => btn.style.opacity = '1', 10);
-            }
-        }
-
-        function hideScrollToTopButton() {
-            const btn = document.getElementById('scroll-to-top-btn');
-            if (btn) {
-                btn.style.opacity = '0';
-                setTimeout(() => btn.style.display = 'none', 300);
-            }
-        }
-
-        // 채팅 박스를 부드럽게 맨 위로 스크롤
-        function scrollToTop() {
-            const box = document.getElementById('chat-box');
-            box.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-            hideScrollToTopButton();
-        }
-
-        // 채팅 박스를 부드럽게 맨 아래로 스크롤
-        function scrollToBottom() {
-            const box = document.getElementById('chat-box');
-            box.scrollTo({
-                top: box.scrollHeight,
-                behavior: 'smooth'
-            });
+            box.scrollTop = box.scrollHeight;
         }
 
         // --- API Calls ---
@@ -720,18 +640,6 @@
             createCalendarTypeSelector('c-cal-a', 'solar', true);       // 궁합 A: 양력/음력/음력(윤)
             createCalendarTypeSelector('c-cal-b', 'solar', true);       // 궁합 B: 양력/음력/음력(윤)
             createCalendarTypeSelector('a-cal-box', 'solar', true);     // 점성학: 양력/음력/음력(윤) (양력 권장)
-            
-            // ========== 채팅 박스 스크롤 감지 ==========
-            const chatBox = document.getElementById('chat-box');
-            chatBox.addEventListener('scroll', function() {
-                const isAtTop = chatBox.scrollTop < 100;
-                const scrollTopBtn = document.getElementById('scroll-to-top-btn');
-                
-                // 맨 위에 있으면 "맨 위로" 버튼 숨김
-                if (isAtTop && scrollTopBtn.style.display === 'block') {
-                    hideScrollToTopButton();
-                }
-            });
             
             // 사주 운세 버튼
             const fortuneBtns = document.querySelectorAll('.fortune-btn');
