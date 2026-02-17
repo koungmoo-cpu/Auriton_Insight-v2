@@ -199,7 +199,14 @@ function appendMessage(sender, text) {
     
     const msgDiv = document.createElement('div');
     msgDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
-    msgDiv.innerHTML = text.replace(/\n/g, '<br>');
+    if (sender === 'user') {
+        msgDiv.textContent = text;
+    } else {
+        const formatted = text.replace(/\n/g, '<br>');
+        msgDiv.innerHTML = typeof DOMPurify !== 'undefined'
+            ? DOMPurify.sanitize(formatted, { ALLOWED_TAGS: ['br', 'span', 'strong', 'em', 'b', 'i'], ALLOWED_ATTR: ['class'] })
+            : formatted.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&lt;br&gt;/g, '<br>');
+    }
     chatBox.appendChild(msgDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 }

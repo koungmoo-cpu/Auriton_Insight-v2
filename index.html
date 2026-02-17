@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Auriton InsightAI</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Sans+KR:wght@300;500;700&family=Orbitron:wght@500&display=swap" rel="stylesheet">
     <style>
         :root { --bg-deep: #0B0E14; --text-main: #e0e0e0; --primary-purple: #b026ff; --primary-cyan: #00f2ff; --primary-pink: #ff0055; --accent-gold: #ffd700; --glass: rgba(20, 15, 35, 0.8); }
@@ -436,10 +437,11 @@
             // 현재 스크롤 위치 저장
             const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 100;
             
-            // AI 메시지는 줄바꿈 처리 및 강조 표시
+            // AI 메시지는 줄바꿈 처리 및 강조 표시 (DOMPurify로 XSS 방지)
             if (sender === 'ai') {
                 div.className = 'ai-msg';
-                div.innerHTML = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<span class="strong-hl">$1</span>');
+                const formatted = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<span class="strong-hl">$1</span>');
+                div.innerHTML = DOMPurify.sanitize(formatted, { ALLOWED_TAGS: ['br', 'span', 'strong', 'em', 'b', 'i'], ALLOWED_ATTR: ['class'] });
             } else {
                 div.className = 'user-msg';
                 div.textContent = text;
