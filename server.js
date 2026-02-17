@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 3000;
 // [1] 보안 및 미들웨어
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
-    : ['http://localhost:3000'];
+    : [];
 
 app.use(helmet({
     contentSecurityPolicy: {
@@ -44,7 +44,10 @@ app.use(helmet({
 
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        // 같은 도메인(same-origin) 요청은 origin이 없거나 동일 → 허용
+        if (!origin) return callback(null, true);
+        // ALLOWED_ORIGINS 설정 시 해당 목록만 허용, 미설정 시 같은 도메인 요청 허용
+        if (ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error('CORS not allowed'));
