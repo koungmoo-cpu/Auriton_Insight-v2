@@ -413,6 +413,68 @@ app.post('/api/saju/fortune', async (req, res) => {
         const config = fortunePrompts[fortuneType];
         if (!config) return res.json({ success: false, error: '올바른 운세 타입이 아닙니다.' });
 
+        // ── monthly 타입: JSON 구조 반환 (주요 날 하이라이트용)
+        if (fortuneType === 'monthly') {
+            const now2 = new Date();
+            const targetYear = now2.getFullYear();
+            const targetMonth = now2.getMonth() + 1;
+            const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+
+            // 이번 달 일진 계산
+            const monthStart = new Date(targetYear, targetMonth - 1, 1);
+            const jiljinData = calculate30DayJilJin(monthStart).slice(0, daysInMonth);
+            const jiljinText = jiljinData.map(d => `  ${d.date}: ${d.jiljin}일`).join('\n');
+
+            const monthPrompt = `
+${buildBaseInstruction()}
+
+[이번 달 월간 운세 분석]
+- 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
+- 사주 명식: ${sajuText}
+- 분석 기간: ${targetYear}년 ${targetMonth}월 (${daysInMonth}일까지)
+
+**✅ 이번 달 일진 (반드시 이 데이터 사용):**
+${jiljinText}
+
+**🚨 아래 JSON 형식으로만 응답하세요. 다른 텍스트 금지.**
+
+{
+  "summary": "이번 달 전체 흐름 요약 (80자 이내)",
+  "advice": "핵심 행동 조언 (60자 이내)",
+  "good_days": [
+    { "day": 날짜숫자, "reason": "15자 이내 이유" }
+  ],
+  "caution_days": [
+    { "day": 날짜숫자, "reason": "15자 이내 이유" }
+  ]
+}
+
+**기준:**
+- good_days: 용신/희신 강하게 작용하는 날, 3~5개
+- caution_days: 기신 작용, 공망, 원진 등 주의 필요한 날, 3~5개
+- JSON만 출력. 마크다운 코드블록(\`\`\`) 사용 금지.
+`;
+            const raw = await callGeminiAPI(monthPrompt, 1500);
+            let monthlyData;
+            try {
+                monthlyData = JSON.parse(raw.replace(/```json|```/g, '').trim());
+            } catch (e) {
+                console.error("❌ monthly JSON 파싱 실패:", e.message, raw.slice(0, 200));
+                return res.json({ success: false, error: 'AI 응답 파싱 실패. 다시 시도해주세요.' });
+            }
+            return res.json({
+                success: true,
+                fortuneType: config.title,
+                isMonthly: true,
+                monthlyData,
+                targetYear,
+                targetMonth,
+                daysInMonth,
+                firstDayOfWeek: new Date(targetYear, targetMonth - 1, 1).getDay()
+            });
+        }
+
+        // ── 나머지 타입: 기존 텍스트 응답
         const prompt = `
 ${buildBaseInstruction()}
 
@@ -425,7 +487,7 @@ ${config.instruction}
 
 답변은 반드시 ${config.maxLength}자를 초과하지 않도록 작성하세요.
 `;
-        const tokenMap = { daily: 1200, weekly: 1200, monthly: 1200, yearly: 2500, decade: 4000, total: 3000 };
+        const tokenMap = { daily: 1200, weekly: 1200, yearly: 2500, decade: 4000, total: 3000 };
         const fortune = await callGeminiAPI(prompt, tokenMap[fortuneType] || 2500);
         res.json({ success: true, fortune, fortuneType: config.title });
 
@@ -664,116 +726,71 @@ app.post('/api/saju/monthly-calendar', async (req, res) => {
         const prompt = `
 ${buildBaseInstruction()}
 
-**재확인: 분석 기간은 ${targetYear}년 ${targetMonth}월, ${yi.ganji}년(${yi.color} ${yi.animal}의 해)입니다**
-
-[30일 월간운세 캘린더 생성]
+[월간 운세 JSON 데이터 생성]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
 - 사주 명식: ${sajuText}
-- 생년월일: ${rawData.userInfo.birthDate}
-- 분석 기간: ${targetYear}년 ${targetMonth}월 1일부터 30일까지
+- 분석 기간: ${targetYear}년 ${targetMonth}월 (${yi.ganji}년)
 
-**✅ 서버에서 정확히 계산된 30일 일진 (반드시 이 데이터를 사용하세요):**
+**✅ 서버에서 정확히 계산된 30일 일진 (반드시 이 데이터 사용):**
 ${jiljinText}
 
-**필수 출력 형식:**
+**🚨 중요: 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.**
 
-1. 전체 흐름 요약 (200자 이내)
-\`\`\`
-🔮 앞으로 30일의 흐름 (${targetYear}년 ${targetMonth}월)
+{
+  "summary": "이번 달 전체 흐름 요약 (100자 이내)",
+  "highlight": {
+    "best": [날짜숫자, 날짜숫자, 날짜숫자],
+    "worst": [날짜숫자, 날짜숫자],
+    "turn": [날짜숫자]
+  },
+  "days": [
+    {
+      "day": 1,
+      "jiljin": "위 제공된 일진",
+      "grade": "great|good|normal|caution|bad",
+      "keyword": "핵심 키워드 2~3개 (예: 재물상승, 계약주의)",
+      "note": "30자 이내 한줄 해석"
+    },
+    ... 2일부터 30일까지 동일 구조
+  ]
+}
 
-이번 달은 [초반/중반/후반]에 [상승/하락/안정] 패턴을 보입니다.
-[용신/희신]이 [강하게/약하게] 작용하는 시기로, [핵심 키워드] 에너지가 두드러집니다.
+**grade 기준:**
+- great: 용신/희신 강하게 작용, 매우 좋은 날
+- good: 긍정 에너지 우세
+- normal: 평범한 날
+- caution: 기신 작용, 주의 필요
+- bad: 기신 강하게 작용, 조심해야 할 날
 
-**핵심:** [2-3문장으로 전체 흐름 요약]
-\`\`\`
-
-2. 에너지 흐름 그래프
-\`\`\`
-📊 30일 에너지 흐름
-
- 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
-[▇▆▅▄▃▂▁ 중 선택]
-
-16 17 18 19 20 21 22 23 24 25 26 27 28 29 30
-[▇▆▅▄▃▂▁ 중 선택]
-
-📈 최고점: [날짜] - [이유]
-⚠ 조심 구간: [날짜] - [이유]
-🔁 전환점: [날짜] - [이유]
-\`\`\`
-
-3. 핵심 인사이트
-\`\`\`
-⭐ 핵심 인사이트 요약
-
-이번 달 특징
-- 초반: [에너지 상태]
-- 중반: [에너지 상태]
-- 후반: [에너지 상태]
-
-가장 좋은 날 → [날짜들]
-조심할 구간 → [날짜들]
-\`\`\`
-
-4. 30일 달력 (${targetYear}년 ${targetMonth}월 실제 달력 요일 반영)
-\`\`\`
-📅 ${targetYear}년 ${targetMonth}월 운세 달력
-
-일  월  화  수  목  금  토
-[실제 달력 형태로 1-30일 배치]
-[각 날짜에 ⭐⭐/⭐/🔁/⚠/▪ 기호 표시]
-
-범례
-⭐⭐ 매우 강한 날  ⭐ 좋은 날  🔁 전환점  ⚠ 조심  ▪ 보통
-\`\`\`
-
-5. 상세 날짜 예시 3~5개 (최고점/최저점/전환점 위주)
-\`\`\`
-📅 ${targetMonth}월 [일]일 – [타이틀] [기호]
-
-일진: [위 제공된 일진 데이터 사용]
-
-🔑 키워드
-- [키워드1]
-- [키워드2]
-- [키워드3]
-
-🔮 해석
-[2-3문장 해석]
-
-💡 행동 제안
-👉 [구체적 행동 제안]
-
-📊 세부 운세
-- 재물운: [1줄]
-- 인간관계: [1줄]
-- 결정사항: [1줄]
-\`\`\`
-
-6. 상담 연결 유도
-\`\`\`
-🔗 더 알아보기
-
-> 특정 날의 연애운이나 사업 운세가 궁금하신가요?
-👉 채팅창에 질문을 남겨주세요.
-\`\`\`
-
-**계산 원칙:**
-- 위에서 제공한 일진 데이터를 반드시 사용하세요 (임의 계산 금지)
-- 사주 명식 "${sajuText}" 기반으로 용신/희신/기신 판단
-- 십성(比劫, 食傷, 財星, 官星, 印星)과 신살(천을귀인, 천덕귀인, 공망, 원진 등) 모두 고려
-- ${targetYear}년 ${targetMonth}월의 실제 달력 요일 정확히 반영
-
-답변은 반드시 4000자를 초과하지 않도록 작성하세요.
+**반드시 30일 전체 days 배열 포함. JSON만 출력. 마크다운 코드블록(\`\`\`) 사용 금지.**
 `;
 
-        const calendar = await callGeminiAPI(prompt, 4000);
+        const raw = await callGeminiAPI(prompt, 4000);
+
+        // JSON 파싱 시도
+        let calendarData;
+        try {
+            const cleaned = raw.replace(/```json|```/g, '').trim();
+            calendarData = JSON.parse(cleaned);
+        } catch (e) {
+            console.error("❌ JSON 파싱 실패:", e.message);
+            return res.json({ success: false, error: 'AI 응답 파싱 실패. 다시 시도해주세요.' });
+        }
+
+        // 달의 실제 날수 계산
+        const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+        // 1일의 요일 (0=일, 1=월, ..., 6=토)
+        const firstDayOfWeek = new Date(targetYear, targetMonth - 1, 1).getDay();
+
         res.json({
             success: true,
-            calendar,
-            targetMonth: `${targetYear}년 ${targetMonth}월`,
+            calendarData,
+            targetYear,
+            targetMonth,
+            targetMonthStr: `${targetYear}년 ${targetMonth}월`,
             sajuText,
-            jiljinData  // 프론트엔드에서도 활용 가능
+            daysInMonth,
+            firstDayOfWeek
         });
 
     } catch (error) {

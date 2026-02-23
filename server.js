@@ -413,64 +413,92 @@ app.post('/api/saju/fortune', async (req, res) => {
         const config = fortunePrompts[fortuneType];
         if (!config) return res.json({ success: false, error: '올바른 운세 타입이 아닙니다.' });
 
-        // ── monthly 타입: JSON 구조 반환 (주요 날 하이라이트용)
-        if (fortuneType === 'monthly') {
+        // ── monthly / weekly: JSON 구조 반환 (상세 요약 + 주요 날 하이라이트)
+        if (fortuneType === 'monthly' || fortuneType === 'weekly') {
             const now2 = new Date();
             const targetYear = now2.getFullYear();
             const targetMonth = now2.getMonth() + 1;
-            const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
 
-            // 이번 달 일진 계산
-            const monthStart = new Date(targetYear, targetMonth - 1, 1);
-            const jiljinData = calculate30DayJilJin(monthStart).slice(0, daysInMonth);
-            const jiljinText = jiljinData.map(d => `  ${d.date}: ${d.jiljin}일`).join('\n');
+            // 이번 주 날짜 범위 계산
+            const weekStart = new Date(now2);
+            weekStart.setDate(now2.getDate() - now2.getDay()); // 이번 주 일요일
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6); // 이번 주 토요일
 
-            const monthPrompt = `
+            // 일진 계산
+            let jiljinText = '';
+            let periodLabel = '';
+            let dayCount = 0;
+
+            if (fortuneType === 'monthly') {
+                const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+                dayCount = daysInMonth;
+                const monthStart = new Date(targetYear, targetMonth - 1, 1);
+                const jd = calculate30DayJilJin(monthStart).slice(0, daysInMonth);
+                jiljinText = jd.map(d => `  ${d.date}: ${d.jiljin}일`).join('\n');
+                periodLabel = `${targetYear}년 ${targetMonth}월 1일~${daysInMonth}일`;
+            } else {
+                dayCount = 7;
+                const jd = calculate30DayJilJin(weekStart).slice(0, 7);
+                jiljinText = jd.map((d, i) => {
+                    const date = new Date(weekStart);
+                    date.setDate(weekStart.getDate() + i);
+                    return `  ${date.getMonth()+1}/${date.getDate()}(${['일','월','화','수','목','금','토'][i]}): ${d.jiljin}일`;
+                }).join('\n');
+                periodLabel = `${weekStart.getMonth()+1}월 ${weekStart.getDate()}일(일)~${weekEnd.getMonth()+1}월 ${weekEnd.getDate()}일(토)`;
+            }
+
+            const isMonthly = fortuneType === 'monthly';
+            const typeLabel = isMonthly ? '월간' : '주간';
+            const summaryLen = isMonthly ? 300 : 200;
+            const daysCount = isMonthly ? '3~5' : '2~3';
+
+            const structuredPrompt = `
 ${buildBaseInstruction()}
 
-[이번 달 월간 운세 분석]
+[${typeLabel} 운세 상세 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
 - 사주 명식: ${sajuText}
-- 분석 기간: ${targetYear}년 ${targetMonth}월 (${daysInMonth}일까지)
+- 분석 기간: ${periodLabel}
 
-**✅ 이번 달 일진 (반드시 이 데이터 사용):**
+**✅ 기간 내 일진 (반드시 이 데이터 사용):**
 ${jiljinText}
 
-**🚨 아래 JSON 형식으로만 응답하세요. 다른 텍스트 금지.**
+**🚨 아래 JSON 형식으로만 응답. 다른 텍스트 금지. 마크다운 코드블록 금지.**
 
 {
-  "summary": "이번 달 전체 흐름 요약 (80자 이내)",
-  "advice": "핵심 행동 조언 (60자 이내)",
+  "title": "${periodLabel} 운세",
+  "summary": "${summaryLen}자 이내로 이 기간 전체 에너지 흐름을 구체적으로 설명. 재물/인간관계/건강/결정 등 영역별로 나눠서 자세히 서술하세요.",
+  "advice": "이 기간 핵심 행동 조언 한 문장 (50자 이내)",
   "good_days": [
-    { "day": 날짜숫자, "reason": "15자 이내 이유" }
+    { "day": "${isMonthly ? '날짜숫자' : '월/일 형식 문자열'}", "label": "한줄 제목 (10자 이내)", "detail": "이 날 왜 좋은지 구체적 설명 (30자 이내)" }
   ],
   "caution_days": [
-    { "day": 날짜숫자, "reason": "15자 이내 이유" }
+    { "day": "${isMonthly ? '날짜숫자' : '월/일 형식 문자열'}", "label": "한줄 제목 (10자 이내)", "detail": "이 날 왜 조심해야 하는지 (30자 이내)" }
   ]
 }
 
 **기준:**
-- good_days: 용신/희신 강하게 작용하는 날, 3~5개
-- caution_days: 기신 작용, 공망, 원진 등 주의 필요한 날, 3~5개
-- JSON만 출력. 마크다운 코드블록(\`\`\`) 사용 금지.
+- summary: 뻔한 이론 금지. 이 사람의 사주 명식 기반으로 구체적 통찰 제공
+- good_days: 용신/희신 작용하는 날 ${daysCount}개. ${isMonthly ? 'day는 숫자(1~31)' : 'day는 "2/24" 형식 문자열'}
+- caution_days: 기신/공망/원진 작용하는 날 ${daysCount}개. 같은 형식
+- JSON만 출력.
 `;
-            const raw = await callGeminiAPI(monthPrompt, 1500);
-            let monthlyData;
+            const raw = await callGeminiAPI(structuredPrompt, 2000);
+            let highlightData;
             try {
-                monthlyData = JSON.parse(raw.replace(/```json|```/g, '').trim());
+                highlightData = JSON.parse(raw.replace(/```json|```/g, '').trim());
             } catch (e) {
-                console.error("❌ monthly JSON 파싱 실패:", e.message, raw.slice(0, 200));
+                console.error(`❌ ${typeLabel} JSON 파싱 실패:`, e.message, raw.slice(0, 200));
                 return res.json({ success: false, error: 'AI 응답 파싱 실패. 다시 시도해주세요.' });
             }
             return res.json({
                 success: true,
                 fortuneType: config.title,
-                isMonthly: true,
-                monthlyData,
+                isHighlight: true,
+                highlightData,
                 targetYear,
-                targetMonth,
-                daysInMonth,
-                firstDayOfWeek: new Date(targetYear, targetMonth - 1, 1).getDay()
+                targetMonth
             });
         }
 
