@@ -57,24 +57,6 @@
         .send-btn { background: var(--accent-gold); color: black; font-weight: bold; border: none; padding: 0 20px; margin-left: 10px; border-radius: 4px; cursor: pointer; font-family: 'Orbitron'; }
 
         @media (max-width: 480px) { .header-title { font-size: 1.5rem; } }
-
-        /* ── 월간 운세 하이라이트 카드 ── */
-        .monthly-card { background: rgba(10,10,25,0.95); border: 1px solid rgba(176,38,255,0.3); border-radius: 14px; padding: 18px; margin-bottom: 6px; }
-        .monthly-title { font-family: 'Orbitron'; font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 10px; text-align: center; }
-        .monthly-summary { font-size: 0.85rem; color: #bbb; line-height: 1.6; padding: 10px 12px; background: rgba(255,255,255,0.03); border-radius: 8px; margin-bottom: 14px; border-left: 3px solid var(--primary-purple); }
-        .monthly-advice { font-size: 0.8rem; color: var(--primary-cyan); margin-bottom: 16px; padding: 8px 12px; background: rgba(0,242,255,0.05); border-radius: 8px; text-align: center; }
-        .monthly-section-title { font-size: 0.72rem; font-family: 'Orbitron'; margin-bottom: 8px; letter-spacing: 1px; }
-        .monthly-section-title.good { color: #ffd700; }
-        .monthly-section-title.bad  { color: #ff7070; }
-        .day-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-        .day-chip { display: flex; flex-direction: column; align-items: center; padding: 8px 10px; border-radius: 10px; min-width: 52px; cursor: default; transition: transform 0.15s; }
-        .day-chip:hover { transform: translateY(-2px); }
-        .day-chip.good-chip  { background: rgba(255,215,0,0.12); border: 1px solid rgba(255,215,0,0.35); }
-        .day-chip.caution-chip { background: rgba(255,70,70,0.1); border: 1px solid rgba(255,70,70,0.3); }
-        .day-chip .chip-day { font-size: 1rem; font-weight: bold; line-height: 1.1; }
-        .day-chip.good-chip .chip-day { color: #ffd700; }
-        .day-chip.caution-chip .chip-day { color: #ff7070; }
-        .day-chip .chip-reason { font-size: 0.6rem; color: #888; margin-top: 3px; text-align: center; line-height: 1.3; max-width: 56px; }
     </style>
 </head>
 <body>
@@ -276,6 +258,9 @@
                 </button>
                 <button class="fortune-btn" data-fortune="total" style="padding:10px; background:linear-gradient(135deg, #30cfd0 0%, #330867 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
                     총운
+                </button>
+                <button class="fortune-btn" data-fortune="calendar" style="padding:10px; background:linear-gradient(135deg, #ff6b6b 0%, #feca57 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s; grid-column: 1 / -1;">
+                    📅 30일 운세 캘린더
                 </button>
             </div>
         </div>
@@ -718,29 +703,29 @@
                 'monthly': '이번 달 운세',
                 'yearly': '올해의 운세',
                 'decade': '10년 운세',
-                'total': '총운'
+                'total': '총운',
+                'calendar': '30일 운세 캘린더'
             };
 
-            appendMsg('ai', `📊 ${fortuneNames[fortuneType] || fortuneType} 분석 중입니다... 잠시만 기다려주세요.`);
-
+            // ✨ 캘린더는 별도 함수로 처리
+            if (fortuneType === 'calendar') {
+                return showMonthlyCalendar();
+            }
+            appendMsg('ai', `📊 ${fortuneNames[fortuneType]} 분석 중입니다... 잠시만 기다려주세요.`);
+            
             try {
                 const res = await fetch('/api/saju/fortune', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    body: JSON.stringify({ 
                         rawData: { userInfo: currentUserInfo },
                         fortuneType: fortuneType
                     })
                 });
                 const data = await res.json();
-
+                
                 if (data.success) {
-                    // monthly는 하이라이트 카드 렌더링
-                    if (data.isMonthly) {
-                        renderMonthlyHighlight(data);
-                    } else {
-                        appendMsg('ai', `📊 **${data.fortuneType}**\n\n${data.fortune}`);
-                    }
+                    appendMsg('ai', `📊 **${data.fortuneType}**\n\n${data.fortune}`);
                 } else {
                     appendMsg('ai', `오류 발생: ${data.error}`);
                 }
@@ -750,47 +735,40 @@
             }
         }
 
-        // ══════════════════════════════════════════
-        // 월간 운세 하이라이트 카드 렌더링
-        // ══════════════════════════════════════════
-        function renderMonthlyHighlight(data) {
-            const { monthlyData, targetYear, targetMonth } = data;
-            const goodDays   = monthlyData.good_days    || [];
-            const cautionDays = monthlyData.caution_days || [];
+        // 30일 운세 캘린더 생성
+        async function showMonthlyCalendar() {
+            if (!currentUserInfo) {
+                appendMsg('ai', '먼저 사주 분석을 완료해주세요.');
+                return;
+            }
 
-            const goodChips = goodDays.map(d =>
-                `<div class="day-chip good-chip">
-                    <span class="chip-day">✨ ${d.day}일</span>
-                    <span class="chip-reason">${d.reason || ''}</span>
-                </div>`
-            ).join('');
+            appendMsg('ai', '📅 30일 운세 캘린더를 생성하고 있습니다... 잠시만 기다려주세요.\n(서버에서 일진 정확히 계산 중...)');
 
-            const cautionChips = cautionDays.map(d =>
-                `<div class="day-chip caution-chip">
-                    <span class="chip-day">⚠️ ${d.day}일</span>
-                    <span class="chip-reason">${d.reason || ''}</span>
-                </div>`
-            ).join('');
+            // 다음 달 1일 날짜를 클라이언트에서 명시적으로 계산해서 전송 (null 전송 금지)
+            const now = new Date();
+            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const startDateStr = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
 
-            const html = `
-            <div class="monthly-card">
-                <div class="monthly-title">📊 ${targetYear}년 ${targetMonth}월 이번 달 운세</div>
-                <div class="monthly-summary">${monthlyData.summary || ''}</div>
-                <div class="monthly-advice">💡 ${monthlyData.advice || ''}</div>
-                <div class="monthly-section-title good">⭐ 좋은 날</div>
-                <div class="day-chips">${goodChips || '<span style="color:#555;font-size:0.8rem">데이터 없음</span>'}</div>
-                <div class="monthly-section-title bad">⚠️ 조심할 날</div>
-                <div class="day-chips">${cautionChips || '<span style="color:#555;font-size:0.8rem">데이터 없음</span>'}</div>
-            </div>`;
+            try {
+                const res = await fetch('/api/saju/monthly-calendar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        rawData: { userInfo: currentUserInfo },
+                        startDate: startDateStr
+                    })
+                });
+                const data = await res.json();
 
-            const box = document.getElementById('chat-box');
-            const div = document.createElement('div');
-            div.className = 'ai-msg';
-            div.style.whiteSpace = 'normal';
-            div.innerHTML = html;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-            setTimeout(showScrollToTopButton, 500);
+                if (data.success) {
+                    appendMsg('ai', `📅 **${data.targetMonth} 운세 캘린더**\n\n${data.calendar}`);
+                } else {
+                    appendMsg('ai', `오류 발생: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Calendar API Error:', error);
+                appendMsg('ai', '캘린더 생성 중 오류가 발생했습니다.');
+            }
         }
         // ========== Astrology Transit Functions ==========
         async function showAstrologyTransit(transitType) {
