@@ -259,9 +259,6 @@
                 <button class="fortune-btn" data-fortune="total" style="padding:10px; background:linear-gradient(135deg, #30cfd0 0%, #330867 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s">
                     총운
                 </button>
-                <button class="fortune-btn" data-fortune="calendar" style="padding:10px; background:linear-gradient(135deg, #ff6b6b 0%, #feca57 100%); color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.2s; grid-column: 1 / -1;">
-                    📅 30일 운세 캘린더
-                </button>
             </div>
         </div>
 
@@ -291,7 +288,8 @@
                         style="display:none; opacity:0; width:45px; height:45px; border-radius:50%; 
                                background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                                border:none; color:white; font-size:1.2rem; cursor:pointer; 
-                               box-shadow:0 4px 12px rgba(0,0,0,0.3); transition:all 0.3s;"
+                               box-shadow:0 4px 12px rgba(0,0,0,0.3); transition:all 0.3s;
+                               display:flex; align-items:center; justify-content:center"
                         title="맨 위로">
                     ⬆️
                 </button>
@@ -315,6 +313,7 @@
                 <button onclick="sendChat()" class="send-btn">SEND</button>
             </div>
         </div>
+    </section>
     </section>
 
     <script>
@@ -525,9 +524,8 @@
             showScreen('screen-result');
             document.getElementById('chat-input-area').style.display = 'flex';
             
-            // ✨ 운세 버튼 표시 / 점성학 버튼 숨김
+            // ✨ 운세 버튼 표시
             document.getElementById('fortune-buttons').style.display = 'block';
-            document.getElementById('astrology-buttons').style.display = 'none';
             
             let loadingMsg = "🔮 운명의 데이터를 분석하고 있습니다...\n(대운 흐름 계산 중)";
             if (timeUnknown) {
@@ -638,9 +636,8 @@
             showScreen('screen-result');
             document.getElementById('chat-input-area').style.display = 'flex';
             
-            // ✨ 점성학 버튼 표시 / 운세 버튼 숨김
+            // ✨ 점성학 버튼 표시
             document.getElementById('astrology-buttons').style.display = 'block';
-            document.getElementById('fortune-buttons').style.display = 'none';
             
             let loadingMsg = `🌌 별들의 위치를 분석하고 있습니다...\n(${calendarType} 기준, 행성 배치 계산 중)`;
             if (timeUnknown) {
@@ -703,14 +700,9 @@
                 'monthly': '이번 달 운세',
                 'yearly': '올해의 운세',
                 'decade': '10년 운세',
-                'total': '총운',
-                'calendar': '30일 운세 캘린더'
+                'total': '총운'
             };
 
-            // ✨ 캘린더는 별도 함수로 처리
-            if (fortuneType === 'calendar') {
-                return showMonthlyCalendar();
-            }
             appendMsg('ai', `📊 ${fortuneNames[fortuneType]} 분석 중입니다... 잠시만 기다려주세요.`);
             
             try {
@@ -735,41 +727,6 @@
             }
         }
 
-        // 30일 운세 캘린더 생성
-        async function showMonthlyCalendar() {
-            if (!currentUserInfo) {
-                appendMsg('ai', '먼저 사주 분석을 완료해주세요.');
-                return;
-            }
-
-            appendMsg('ai', '📅 30일 운세 캘린더를 생성하고 있습니다... 잠시만 기다려주세요.\n(서버에서 일진 정확히 계산 중...)');
-
-            // 다음 달 1일 날짜를 클라이언트에서 명시적으로 계산해서 전송 (null 전송 금지)
-            const now = new Date();
-            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-            const startDateStr = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
-
-            try {
-                const res = await fetch('/api/saju/monthly-calendar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        rawData: { userInfo: currentUserInfo },
-                        startDate: startDateStr
-                    })
-                });
-                const data = await res.json();
-
-                if (data.success) {
-                    appendMsg('ai', `📅 **${data.targetMonth} 운세 캘린더**\n\n${data.calendar}`);
-                } else {
-                    appendMsg('ai', `오류 발생: ${data.error}`);
-                }
-            } catch (error) {
-                console.error('Calendar API Error:', error);
-                appendMsg('ai', '캘린더 생성 중 오류가 발생했습니다.');
-            }
-        }
         // ========== Astrology Transit Functions ==========
         async function showAstrologyTransit(transitType) {
             if (!currentUserInfo) {

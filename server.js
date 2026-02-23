@@ -1,8 +1,10 @@
 /* ============================================
-   🖥️ Auriton InsightAI v4.0 - Error Handling Enhanced
-   Updated: 2025-02-05
-   - 궁합 계산 오류 처리 추가
-   - 운세 세분화 기능 추가 (일간/주간/월간/올해/10년/총운)
+   🖥️ Auriton InsightAI v5.0 - Full Refactor
+   Updated: 2025-02-24
+   - 날짜 동적 처리 (하드코딩 제거)
+   - 중복 라우트 제거 (astrology/chat)
+   - validateUserInfo / getTodayString / getYearInfo 구현
+   - 30일 일진 서버에서 정확히 계산 후 AI에 전달
    ============================================ */
 
 import 'dotenv/config';
@@ -21,14 +23,15 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ─────────────────────────────────────────────
 // [1] 보안 및 미들웨어
+// ─────────────────────────────────────────────
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: false,
     crossOriginResourcePolicy: false,
 }));
-
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -43,7 +46,9 @@ app.use('/api/', apiLimiter);
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// [2] Gemini API
+// ─────────────────────────────────────────────
+// [2] Gemini API 초기화
+// ─────────────────────────────────────────────
 const apiKey = process.env.GEMINI_API_KEY;
 let model = null;
 
@@ -51,121 +56,196 @@ if (apiKey && apiKey !== 'PLACEHOLDER_API_KEY') {
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
         model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    } catch (e) { console.error("Model Init Failed", e); }
+    } catch (e) {
+        console.error("Model Init Failed", e);
+    }
 }
 
-async function callGeminiAPI(prompt) {
+async function callGeminiAPI(prompt, maxTokens = 2500) {
     if (!model) throw new Error('API Key 설정이 필요합니다.');
     const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.8, maxOutputTokens: 2500 }
+        generationConfig: { temperature: 0.8, maxOutputTokens: maxTokens }
     });
     return await result.response.text();
 }
 
-// [3] 안전한 한글 매핑 로직
-const BASE_INSTRUCTION = `
-당신은 고대의 지혜와 미래의 AI가 결합된 'Auriton InsightAI'의 마스터입니다.
+// ─────────────────────────────────────────────
+// [3] 날짜 유틸리티 (동적 처리)
+// ─────────────────────────────────────────────
 
+/** 오늘 날짜를 "2026년 2월 24일 (월요일)" 형식으로 반환 */
+function getTodayString() {
+    const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+    const now = new Date();
+    return `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${days[now.getDay()]})`;
+}
+
+/** 연도별 간지 정보 반환 */
+function getYearInfo(year) {
+    const ganjiList = [
+        { ganji: '갑자', color: '푸른', animal: '쥐' },
+        { ganji: '을축', color: '푸른', animal: '소' },
+        { ganji: '병인', color: '붉은', animal: '호랑이' },
+        { ganji: '정묘', color: '붉은', animal: '토끼' },
+        { ganji: '무진', color: '누런', animal: '용' },
+        { ganji: '기사', color: '누런', animal: '뱀' },
+        { ganji: '경오', color: '흰', animal: '말' },
+        { ganji: '신미', color: '흰', animal: '양' },
+        { ganji: '임신', color: '검은', animal: '원숭이' },
+        { ganji: '계유', color: '검은', animal: '닭' },
+        { ganji: '갑술', color: '푸른', animal: '개' },
+        { ganji: '을해', color: '푸른', animal: '돼지' },
+        { ganji: '병자', color: '붉은', animal: '쥐' },
+        { ganji: '정축', color: '붉은', animal: '소' },
+        { ganji: '무인', color: '누런', animal: '호랑이' },
+        { ganji: '기묘', color: '누런', animal: '토끼' },
+        { ganji: '경진', color: '흰', animal: '용' },
+        { ganji: '신사', color: '흰', animal: '뱀' },
+        { ganji: '임오', color: '검은', animal: '말' },
+        { ganji: '계미', color: '검은', animal: '양' },
+        { ganji: '갑신', color: '푸른', animal: '원숭이' },
+        { ganji: '을유', color: '푸른', animal: '닭' },
+        { ganji: '병술', color: '붉은', animal: '개' },
+        { ganji: '정해', color: '붉은', animal: '돼지' },
+        { ganji: '무자', color: '누런', animal: '쥐' },
+        { ganji: '기축', color: '누런', animal: '소' },
+        { ganji: '경인', color: '흰', animal: '호랑이' },
+        { ganji: '신묘', color: '흰', animal: '토끼' },
+        { ganji: '임진', color: '검은', animal: '용' },
+        { ganji: '계사', color: '검은', animal: '뱀' },
+        { ganji: '갑오', color: '푸른', animal: '말' },
+        { ganji: '을미', color: '푸른', animal: '양' },
+        { ganji: '병신', color: '붉은', animal: '원숭이' },
+        { ganji: '정유', color: '붉은', animal: '닭' },
+        { ganji: '무술', color: '누런', animal: '개' },
+        { ganji: '기해', color: '누런', animal: '돼지' },
+        { ganji: '경자', color: '흰', animal: '쥐' },
+        { ganji: '신축', color: '흰', animal: '소' },
+        { ganji: '임인', color: '검은', animal: '호랑이' },
+        { ganji: '계묘', color: '검은', animal: '토끼' },
+        { ganji: '갑진', color: '푸른', animal: '용' },
+        { ganji: '을사', color: '푸른', animal: '뱀' },
+        { ganji: '병오', color: '붉은', animal: '말' },   // 2026
+        { ganji: '정미', color: '붉은', animal: '양' },
+        { ganji: '무신', color: '누런', animal: '원숭이' },
+        { ganji: '기유', color: '누런', animal: '닭' },
+        { ganji: '경술', color: '흰', animal: '개' },
+        { ganji: '신해', color: '흰', animal: '돼지' },
+        { ganji: '임자', color: '검은', animal: '쥐' },
+        { ganji: '계축', color: '검은', animal: '소' },
+        { ganji: '갑인', color: '푸른', animal: '호랑이' },
+        { ganji: '을묘', color: '푸른', animal: '토끼' },
+        { ganji: '병진', color: '붉은', animal: '용' },
+        { ganji: '정사', color: '붉은', animal: '뱀' },
+        { ganji: '무오', color: '누런', animal: '말' },
+        { ganji: '기미', color: '누런', animal: '양' },
+        { ganji: '경신', color: '흰', animal: '원숭이' },
+        { ganji: '신유', color: '흰', animal: '닭' },
+        { ganji: '임술', color: '검은', animal: '개' },
+        { ganji: '계해', color: '검은', animal: '돼지' },
+    ];
+    // 갑자년 기준: 1924년이 갑자년 (60갑자 기준)
+    const BASE_YEAR = 1924;
+    const idx = ((year - BASE_YEAR) % 60 + 60) % 60;
+    return ganjiList[idx];
+}
+
+/** 현재 연도 정보 문자열 생성 */
+function buildDateContext() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const yi = getYearInfo(year);
+    const prevYi = getYearInfo(year - 1);
+    const nextYi = getYearInfo(year + 1);
+
+    return `
 **📅 현재 시점 정보 (절대 틀리지 마세요!)**
-- 오늘 날짜: 2026년 2월 7일 (토요일)
-- 올해: 2026년 = 병오년(丙午年) = 붉은 말의 해
-- 간지: 병오(丙午)
-  * 병(丙): 天干 3번째, 火(화), 붉은색, 양간
-  * 오(午): 地支 7번째, 火(화), 말(馬), 남방, 여름
-- 오행: 火火 → 火 기운이 매우 강함
-- 특징: 열정, 역동성, 빠른 변화, 추진력, 도전
+- 오늘 날짜: ${getTodayString()}
+- 올해: ${year}년 = ${yi.ganji}년 = ${yi.color} ${yi.animal}의 해
 
-**🔥 2026년 병오년의 에너지:**
-- 火 기운 극대화: 열정적이고 활발한 한 해
-- 말의 속성: 빠름, 자유, 진취적
-- 붉은 색: 강렬함, 생명력, 변화
-- 주의: 성급함, 과열 주의
-
-**📆 주변 연도 참고 (절대 혼동하지 마세요):**
-- 2023년 = 계묘년 (검은 토끼) - 이미 지남
-- 2024년 = 갑진년 (푸른 용) - 이미 지남
-- 2025년 = 을사년 (푸른 뱀) - 작년
-- 2026년 = 병오년 (붉은 말) ← ★ 올해 ★
-- 2027년 = 정미년 (붉은 양) - 내년
-- 2028년 = 무신년 (누런 원숭이)
+**📆 주변 연도 참고:**
+- ${year - 2}년 = ${getYearInfo(year - 2).ganji}년 (${getYearInfo(year - 2).color} ${getYearInfo(year - 2).animal}) - 이미 지남
+- ${year - 1}년 = ${prevYi.ganji}년 (${prevYi.color} ${prevYi.animal}) - 작년
+- ${year}년 = ${yi.ganji}년 (${yi.color} ${yi.animal}) ← ★ 올해 ★
+- ${year + 1}년 = ${nextYi.ganji}년 (${nextYi.color} ${nextYi.animal}) - 내년
 
 **🚨 절대 규칙:**
-1. "올해"는 항상 2026년, 병오년, 붉은 말의 해입니다
-2. 2026년을 다른 연도(계묘년, 갑진년, 을사년 등)로 절대 착각하지 마세요
-3. 연도를 언급할 때는 반드시 위 정보를 참고하세요
-4. 10년 운세 등에서 연도를 나열할 때도 위 정보 기준으로 정확히 계산하세요
+1. "올해"는 항상 ${year}년, ${yi.ganji}년, ${yi.color} ${yi.animal}의 해입니다.
+2. 연도를 언급할 때는 반드시 위 정보를 기준으로 정확히 계산하세요.
+`;
+}
+
+// ─────────────────────────────────────────────
+// [4] BASE_INSTRUCTION (동적 날짜 포함)
+// ─────────────────────────────────────────────
+function buildBaseInstruction() {
+    return `
+당신은 고대의 지혜와 미래의 AI가 결합된 'Auriton InsightAI'의 마스터입니다.
+
+${buildDateContext()}
 
 모든 답변은 한국어 경어체(해요체)로 작성하세요.
 절대로 뻔한 이론적인 설명은 하지 말고, 사용자에 대한 통찰과 해석을 제공하세요.
 `;
+}
 
+// ─────────────────────────────────────────────
+// [5] 한자 → 한글 매핑
+// ─────────────────────────────────────────────
 const HAN_TO_HANGUL = {
-    '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무', '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계',
-    '子': '자', '丑': '축', '寅': '인', '卯': '묘', '辰': '진', '巳': '사', '午': '오', '未': '미', '申': '신', '酉': '유', '戌': '술', '亥': '해'
+    '甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
+    '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계',
+    '子': '자', '丑': '축', '寅': '인', '卯': '묘', '辰': '진',
+    '巳': '사', '午': '오', '未': '미', '申': '신', '酉': '유',
+    '戌': '술', '亥': '해'
 };
+const toHangul = (str) => str ? str.split('').map(c => HAN_TO_HANGUL[c] || c).join('') : '';
 
-const toHangul = (str) => {
-    if (!str) return '';
-    return str.split('').map(char => HAN_TO_HANGUL[char] || char).join('');
-};
+// ─────────────────────────────────────────────
+// [6] 입력값 검증
+// ─────────────────────────────────────────────
+function validateUserInfo(userInfo) {
+    if (!userInfo) return '사용자 정보가 없습니다.';
+    if (!userInfo.name || userInfo.name.trim() === '') return '이름을 입력해주세요.';
+    if (!userInfo.birthDate) return '생년월일을 입력해주세요.';
+    const parts = userInfo.birthDate.split('-');
+    if (parts.length !== 3) return '생년월일 형식이 올바르지 않습니다. (YYYY-MM-DD)';
+    const [y, m, d] = parts.map(Number);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) return '생년월일에 숫자가 아닌 값이 포함되어 있습니다.';
+    if (m < 1 || m > 12) return '월은 1~12 사이여야 합니다.';
+    if (d < 1 || d > 31) return '일은 1~31 사이여야 합니다.';
+    return null; // 오류 없음
+}
 
-// [3-2] 음력을 양력으로 변환하는 함수 (점성학용)
+// ─────────────────────────────────────────────
+// [7] 음력 → 양력 변환
+// ─────────────────────────────────────────────
 function convertToSolar(userInfo) {
     console.log("🔄 [Convert to Solar] Input:", JSON.stringify(userInfo));
-    
     try {
-        if (!userInfo || !userInfo.birthDate) {
-            throw new Error("생년월일 정보가 누락되었습니다.");
-        }
+        const vErr = validateUserInfo(userInfo);
+        if (vErr) throw new Error(vErr);
 
-        const parts = userInfo.birthDate.split('-');
-        if (parts.length !== 3) {
-            throw new Error(`날짜 형식이 잘못되었습니다 (${userInfo.birthDate})`);
-        }
-
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const day = parseInt(parts[2], 10);
-
-        if (isNaN(year) || isNaN(month) || isNaN(day)) {
-            throw new Error("날짜에 숫자가 아닌 값이 포함되어 있습니다.");
-        }
-
+        const [year, month, day] = userInfo.birthDate.split('-').map(Number);
         const calType = (userInfo.calendarType || 'solar').toLowerCase();
 
-        // 음력이면 양력으로 변환
         if (calType.includes('lunar') || calType.includes('음력')) {
             const isLeapMonth = calType.includes('윤') || calType.includes('leap');
             console.log(`🌙→☀️ Converting Lunar to Solar... ${isLeapMonth ? '(윤달)' : '(평달)'}`);
-            
-            try {
-                const lunarObj = Lunar.fromYmdHms(year, month, day, 12, 0, 0, isLeapMonth ? 1 : 0);
-                if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
-                
-                const solarObj = lunarObj.getSolar();
-                const solarYear = solarObj.getYear();
-                const solarMonth = solarObj.getMonth();
-                const solarDay = solarObj.getDay();
-                
-                console.log(`✅ Converted: ${year}-${month}-${day} (음력) → ${solarYear}-${solarMonth}-${solarDay} (양력)`);
-                
-                return {
-                    birthDate: `${solarYear}-${String(solarMonth).padStart(2, '0')}-${String(solarDay).padStart(2, '0')}`,
-                    originalDate: userInfo.birthDate,
-                    originalCalendar: userInfo.calendarType,
-                    converted: true
-                };
-            } catch (e) {
-                throw new Error(`음력→양력 변환 실패: ${e.message}`);
-            }
-        } else {
-            // 이미 양력이면 그대로 반환
-            console.log("☀️ Already Solar, no conversion needed");
+            const lunarObj = Lunar.fromYmdHms(year, month, day, 12, 0, 0, isLeapMonth ? 1 : 0);
+            if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
+            const solarObj = lunarObj.getSolar();
+            const sy = solarObj.getYear(), sm = solarObj.getMonth(), sd = solarObj.getDay();
+            console.log(`✅ Converted: ${year}-${month}-${day} (음력) → ${sy}-${sm}-${sd} (양력)`);
             return {
-                birthDate: userInfo.birthDate,
-                converted: false
+                birthDate: `${sy}-${String(sm).padStart(2, '0')}-${String(sd).padStart(2, '0')}`,
+                originalDate: userInfo.birthDate,
+                originalCalendar: userInfo.calendarType,
+                converted: true
             };
+        } else {
+            return { birthDate: userInfo.birthDate, converted: false };
         }
     } catch (e) {
         console.error("❌ [Conversion Error]:", e.message);
@@ -173,69 +253,44 @@ function convertToSolar(userInfo) {
     }
 }
 
-// [4] 사주 계산 함수
+// ─────────────────────────────────────────────
+// [8] 사주 계산
+// ─────────────────────────────────────────────
 function calculateSajuText(userInfo) {
-    console.log("🔍 [Calc Start] Input Data:", JSON.stringify(userInfo));
-
+    console.log("🔍 [Calc Start] Input:", JSON.stringify(userInfo));
     try {
-        if (!userInfo || !userInfo.birthDate) throw new Error("생년월일 정보가 누락되었습니다.");
+        const vErr = validateUserInfo(userInfo);
+        if (vErr) throw new Error(vErr);
 
-        const parts = userInfo.birthDate.split('-');
-        if (parts.length !== 3) throw new Error(`날짜 형식이 잘못되었습니다 (${userInfo.birthDate})`);
-
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const day = parseInt(parts[2], 10);
-
-        if (isNaN(year) || isNaN(month) || isNaN(day)) throw new Error("날짜에 숫자가 아닌 값이 포함되어 있습니다.");
-
-        let hour = 12; 
+        const [year, month, day] = userInfo.birthDate.split('-').map(Number);
+        let hour = 12;
         if (userInfo.birthTime && userInfo.birthTime !== 'unknown') {
-            const timeMatch = userInfo.birthTime.match(/(\d+):(\d+)/);
-            if (timeMatch) hour = parseInt(timeMatch[1], 10);
+            const m = userInfo.birthTime.match(/(\d+):(\d+)/);
+            if (m) hour = parseInt(m[1], 10);
         }
 
-        console.log(`📅 Parsed: ${year}-${month}-${day} ${hour}:00, Type: ${userInfo.calendarType}`);
-
-        let eightChar;
         const calType = (userInfo.calendarType || 'solar').toLowerCase();
+        let eightChar;
 
-        // 음력 판단: 'lunar', '음력', '음력(윤)' 포함 시
         if (calType.includes('lunar') || calType.includes('음력')) {
             const isLeapMonth = calType.includes('윤') || calType.includes('leap');
-            console.log(`🌙 Processing Lunar Date... ${isLeapMonth ? '(윤달)' : '(평달)'}`);
-            
-            try {
-                const lunarObj = Lunar.fromYmdHms(year, month, day, hour, 0, 0, isLeapMonth ? 1 : 0);
-                if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
-                eightChar = lunarObj.getEightChar();
-            } catch (e) {
-                throw new Error(`음력 날짜 처리 실패: ${e.message}`);
-            }
+            const lunarObj = Lunar.fromYmdHms(year, month, day, hour, 0, 0, isLeapMonth ? 1 : 0);
+            if (!lunarObj) throw new Error("음력 날짜 객체 생성 실패");
+            eightChar = lunarObj.getEightChar();
         } else {
-            // 그 외 모든 경우 양력으로 처리 ('solar', '양력', 기타)
-            console.log("☀️ Processing Solar Date...");
-            try {
-                const solarObj = Solar.fromYmdHms(year, month, day, hour, 0, 0);
-                if (!solarObj) throw new Error("양력 날짜 객체 생성 실패");
-                eightChar = solarObj.getLunar().getEightChar();
-            } catch (e) {
-                throw new Error(`양력 날짜 처리 실패: ${e.message}`);
-            }
+            const solarObj = Solar.fromYmdHms(year, month, day, hour, 0, 0);
+            if (!solarObj) throw new Error("양력 날짜 객체 생성 실패");
+            eightChar = solarObj.getLunar().getEightChar();
         }
 
-        const yearGan = toHangul(eightChar.getYearGan());
-        const yearZhi = toHangul(eightChar.getYearZhi());
-        const monthGan = toHangul(eightChar.getMonthGan());
-        const monthZhi = toHangul(eightChar.getMonthZhi());
-        const dayGan = toHangul(eightChar.getDayGan());
-        const dayZhi = toHangul(eightChar.getDayZhi());
-        const hourGan = toHangul(eightChar.getTimeGan()); 
-        const hourZhi = toHangul(eightChar.getTimeZhi());
+        const result = [
+            `${toHangul(eightChar.getYearGan())}${toHangul(eightChar.getYearZhi())}년`,
+            `${toHangul(eightChar.getMonthGan())}${toHangul(eightChar.getMonthZhi())}월`,
+            `${toHangul(eightChar.getDayGan())}${toHangul(eightChar.getDayZhi())}일`,
+            `${toHangul(eightChar.getTimeGan())}${toHangul(eightChar.getTimeZhi())}시`,
+        ].join(' ');
 
-        const result = `${yearGan}${yearZhi}년 ${monthGan}${monthZhi}월 ${dayGan}${dayZhi}일 ${hourGan}${hourZhi}시`;
-        console.log("✅ Result:", result);
-        
+        console.log("✅ Saju Result:", result);
         return result;
 
     } catch (e) {
@@ -244,47 +299,54 @@ function calculateSajuText(userInfo) {
     }
 }
 
-// [5] API 라우트
+// ─────────────────────────────────────────────
+// [9] 30일 일진 서버에서 계산
+// ─────────────────────────────────────────────
+function calculate30DayJilJin(startDate) {
+    const results = [];
+    for (let i = 0; i < 30; i++) {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + i);
+        try {
+            const solar = Solar.fromYmdHms(d.getFullYear(), d.getMonth() + 1, d.getDate(), 12, 0, 0);
+            const ec = solar.getLunar().getEightChar();
+            results.push({
+                date: `${d.getMonth() + 1}/${d.getDate()}`,
+                jiljin: `${toHangul(ec.getDayGan())}${toHangul(ec.getDayZhi())}`
+            });
+        } catch (e) {
+            results.push({ date: `${d.getMonth() + 1}/${d.getDate()}`, jiljin: '계산불가' });
+        }
+    }
+    return results;
+}
 
-// [5-1] 궁합 계산 API (오류 처리 강화)
+// ─────────────────────────────────────────────
+// [10] API 라우트
+// ─────────────────────────────────────────────
+
+// [10-1] 궁합
 app.post('/api/compatibility', async (req, res) => {
     try {
         const { person1, person2 } = req.body;
-        
-        console.log("💞 [Compatibility Request]");
-        console.log("Person 1:", JSON.stringify(person1));
-        console.log("Person 2:", JSON.stringify(person2));
-        
         if (!person1 || !person2) {
-            return res.json({ 
-                success: false, 
-                error: '두 사람의 정보가 모두 필요합니다.' 
-            });
+            return res.json({ success: false, error: '두 사람의 정보가 모두 필요합니다.' });
         }
 
-        console.log("🔮 Calculating Saju for Person 1...");
         const saju1 = calculateSajuText(person1);
-        console.log("✅ Person 1 Saju:", saju1);
-        
-        console.log("🔮 Calculating Saju for Person 2...");
         const saju2 = calculateSajuText(person2);
-        console.log("✅ Person 2 Saju:", saju2);
-        
+
         if (saju1.startsWith('ERROR:') || saju2.startsWith('ERROR:')) {
-            const errorMsg = saju1.startsWith('ERROR:') ? saju1 : saju2;
-            console.error("❌ Saju Calculation Failed:", errorMsg);
-            return res.json({ 
-                success: false, 
-                error: `궁합 계산 중 오류가 발생했습니다.\n\n${errorMsg.replace('ERROR: ', '')}\n\n입력 정보를 다시 확인해주세요.` 
-            });
+            const errMsg = saju1.startsWith('ERROR:') ? saju1 : saju2;
+            return res.json({ success: false, error: `궁합 계산 오류\n\n${errMsg.replace('ERROR: ', '')}\n\n입력 정보를 다시 확인해주세요.` });
         }
 
-        console.log("🤖 Generating AI Analysis...");
         const prompt = `
-${BASE_INSTRUCTION}
+${buildBaseInstruction()}
+
 [궁합 분석]
-- 첫 번째 사람: ${person1.name} (${person1.gender}) - ${saju1}
-- 두 번째 사람: ${person2.name} (${person2.gender}) - ${saju2}
+- 첫 번째: ${person1.name} (${person1.gender}) - ${saju1}
+- 두 번째: ${person2.name} (${person2.gender}) - ${saju2}
 
 두 사람의 사주 궁합을 음양오행 관점에서 분석하고, 관계 발전을 위한 조언을 해주세요.
 1. 음양오행 조화도
@@ -292,57 +354,54 @@ ${BASE_INSTRUCTION}
 3. 관계 발전을 위한 구체적 조언
 `;
         const result = await callGeminiAPI(prompt);
-        console.log("✅ Analysis Complete");
         res.json({ success: true, analysis: result });
-        
+
     } catch (error) {
         console.error("❌ [Compatibility Error]", error);
-        res.json({ 
-            success: false, 
-            error: `궁합 분석 중 시스템 오류가 발생했습니다.\n\n오류 내용: ${error.message}\n\n잠시 후 다시 시도해주세요.` 
-        });
+        res.json({ success: false, error: `궁합 분석 중 오류 발생\n\n${error.message}` });
     }
 });
 
-// [5-2] 운세 세분화 API
+// [10-2] 운세 세분화 (일간/주간/월간/올해/10년/총운)
 app.post('/api/saju/fortune', async (req, res) => {
     try {
         const { rawData, fortuneType } = req.body;
-        
-        const sajuText = calculateSajuText(rawData?.userInfo);
-        
-        if (!sajuText || sajuText.startsWith('ERROR:')) {
-            return res.json({ 
-                success: false, 
-                error: '사주 정보를 불러올 수 없습니다.' 
-            });
+        const vErr = validateUserInfo(rawData?.userInfo);
+        if (vErr) return res.json({ success: false, error: vErr });
+
+        const sajuText = calculateSajuText(rawData.userInfo);
+        if (sajuText.startsWith('ERROR:')) {
+            return res.json({ success: false, error: sajuText.replace('ERROR: ', '') });
         }
+
+        const now = new Date();
+        const yi = getYearInfo(now.getFullYear());
 
         const fortunePrompts = {
             daily: {
                 title: '오늘의 운세',
                 maxLength: 700,
-                instruction: '2026년 2월 7일(병오년) 오늘 하루의 에너지 흐름과 주의사항을 700자 이내로 간결하게 설명하세요.'
+                instruction: `${getTodayString()} 오늘 하루의 에너지 흐름과 주의사항을 700자 이내로 간결하게 설명하세요.`
             },
             weekly: {
                 title: '이번 주 운세',
                 maxLength: 700,
-                instruction: '2026년 2월 이번 주의 전반적인 흐름과 중요 포인트를 700자 이내로 설명하세요.'
+                instruction: `${now.getFullYear()}년 ${now.getMonth() + 1}월 이번 주의 전반적인 흐름과 중요 포인트를 700자 이내로 설명하세요.`
             },
             monthly: {
                 title: '이번 달 운세',
                 maxLength: 700,
-                instruction: '2026년 2월(병오년) 이번 달의 운세와 집중해야 할 영역을 700자 이내로 설명하세요.'
+                instruction: `${now.getFullYear()}년 ${now.getMonth() + 1}월의 운세와 집중해야 할 영역을 700자 이내로 설명하세요.`
             },
             yearly: {
                 title: '올해의 운세',
                 maxLength: 1500,
-                instruction: '2026년 병오년(붉은 말의 해) 전체의 큰 흐름, 기회와 도전을 1500자 이내로 상세히 설명하세요. 병오년의 火火 에너지가 사용자에게 미치는 영향을 중심으로 분석하세요.'
+                instruction: `${now.getFullYear()}년 ${yi.ganji}년(${yi.color} ${yi.animal}의 해) 전체의 큰 흐름, 기회와 도전을 1500자 이내로 상세히 설명하세요.`
             },
             decade: {
                 title: '10년 운세',
                 maxLength: 4000,
-                instruction: '2026년(병오년)부터 2036년까지 향후 10년간의 대운 흐름과 각 시기별 특징을 4000자 이내로 깊이 있게 분석하세요. 각 연도의 간지를 정확히 계산하여 언급하세요.'
+                instruction: `${now.getFullYear()}년(${yi.ganji}년)부터 ${now.getFullYear() + 10}년까지 향후 10년간의 대운 흐름과 각 시기별 특징을 4000자 이내로 깊이 있게 분석하세요. 각 연도의 간지를 정확히 계산하여 언급하세요.`
             },
             total: {
                 title: '총운',
@@ -352,14 +411,10 @@ app.post('/api/saju/fortune', async (req, res) => {
         };
 
         const config = fortunePrompts[fortuneType];
-        if (!config) {
-            return res.json({ success: false, error: '올바른 운세 타입이 아닙니다.' });
-        }
+        if (!config) return res.json({ success: false, error: '올바른 운세 타입이 아닙니다.' });
 
         const prompt = `
-${BASE_INSTRUCTION}
-
-**재확인: 오늘은 2026년 2월 7일, 병오년(붉은 말의 해)입니다**
+${buildBaseInstruction()}
 
 [${config.title} 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
@@ -370,46 +425,34 @@ ${config.instruction}
 
 답변은 반드시 ${config.maxLength}자를 초과하지 않도록 작성하세요.
 `;
-
-        const fortune = await callGeminiAPI(prompt);
-        res.json({ 
-            success: true, 
-            fortune: fortune,
-            fortuneType: config.title
-        });
+        const tokenMap = { daily: 1200, weekly: 1200, monthly: 1200, yearly: 2500, decade: 4000, total: 3000 };
+        const fortune = await callGeminiAPI(prompt, tokenMap[fortuneType] || 2500);
+        res.json({ success: true, fortune, fortuneType: config.title });
 
     } catch (error) {
         console.error("❌ [Fortune Error]", error);
-        res.json({ 
-            success: false, 
-            error: '운세 분석 중 오류가 발생했습니다.' 
-        });
+        res.json({ success: false, error: '운세 분석 중 오류가 발생했습니다.' });
     }
 });
 
-// [5-3] 사주 상담 API
+// [10-3] 사주 상담
 app.post('/api/saju/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        
-        const sajuText = calculateSajuText(rawData?.userInfo);
-        
-        if (!sajuText || sajuText.startsWith('ERROR:')) {
-            const errorMsg = sajuText ? sajuText.replace('ERROR: ', '') : '알 수 없는 오류';
-            return res.json({ 
-                success: true, 
-                consultation: `🚫 **분석 오류 발생**\n\n죄송합니다. 오류가 발생했습니다.\n\n**상세 에러:**\n${errorMsg}\n\n다시 시도해주세요.` 
-            });
+        const vErr = validateUserInfo(rawData?.userInfo);
+        if (vErr) return res.json({ success: false, error: vErr });
+
+        const sajuText = calculateSajuText(rawData.userInfo);
+        if (sajuText.startsWith('ERROR:')) {
+            return res.json({ success: true, consultation: `🚫 **분석 오류**\n\n${sajuText.replace('ERROR: ', '')}\n\n다시 시도해주세요.` });
         }
 
-        const timeWarning = rawData.userInfo.timeUnknown 
-            ? '\n\n⚠️ **시간 정보 없음**: 시주(時柱)는 정오(12:00) 기준으로 참고만 하세요. 일주까지의 분석이 더 정확합니다.' 
+        const timeWarning = rawData.userInfo.timeUnknown
+            ? '\n\n⚠️ **시간 정보 없음**: 시주(時柱)는 정오(12:00) 기준으로 참고만 하세요.'
             : '';
 
         const prompt = `
-${BASE_INSTRUCTION}
-
-**재확인: 오늘은 2026년 2월 7일, 병오년(붉은 말의 해)입니다**
+${buildBaseInstruction()}
 
 [분석 데이터]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
@@ -419,110 +462,98 @@ ${BASE_INSTRUCTION}
 
 1. **핵심 본성 (일간 분석)**: 이 사람이 어떤 기질을 타고났는지 비유를 들어 설명하세요.
 2. **에너지의 균형**: 강한 기운과 부족한 기운이 삶에 미치는 영향을 분석하세요.
-3. **2026년 병오년의 영향**: 올해 火火 에너지가 이 사람에게 미치는 영향을 분석하세요.
+3. **올해의 영향**: 올해 에너지가 이 사람에게 미치는 영향을 분석하세요.
 4. **현대적 개운법**: 구체적인 색상, 행동 지침을 제안하세요.
 `;
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
 
     } catch (error) {
-        console.error("❌ [API Route Error]", error);
-        res.json({ success: false, consultation: `서버 내부 치명적 오류: ${error.message}` });
+        console.error("❌ [Consultation Error]", error);
+        res.json({ success: false, error: `서버 오류: ${error.message}` });
     }
 });
 
-// [5-4] 점성학 상담 API
+// [10-4] 점성학 상담
 app.post('/api/astrology/consultation', async (req, res) => {
     try {
         const { rawData } = req.body;
-        
-        console.log("⭐ [Astrology Request] Original Data:", JSON.stringify(rawData.userInfo));
-        
-        // 음력이면 양력으로 변환
-        const conversionResult = convertToSolar(rawData.userInfo);
-        const solarDate = conversionResult.birthDate;
-        
-        let dateInfo = '';
-        if (conversionResult.converted) {
-            dateInfo = `\n- 원본 입력: ${conversionResult.originalDate} (${conversionResult.originalCalendar})\n- 변환된 양력: ${solarDate}`;
-            console.log(`✅ Converted for Astrology: ${conversionResult.originalDate} → ${solarDate}`);
-        } else {
-            dateInfo = `\n- 양력: ${solarDate}`;
-            console.log(`✅ Using Solar Date: ${solarDate}`);
-        }
+        const vErr = validateUserInfo(rawData?.userInfo);
+        if (vErr) return res.json({ success: false, error: vErr });
 
-        const timeWarning = rawData.userInfo.timeUnknown 
-            ? '\n\n⚠️ **시간 정보 없음**: 상승궁(ASC)은 정오(12:00) 기준이므로 정확하지 않을 수 있습니다. 태양, 달, 행성 배치 분석에 집중하세요.' 
+        const convResult = convertToSolar(rawData.userInfo);
+        const solarDate = convResult.birthDate;
+        const dateInfo = convResult.converted
+            ? `\n- 원본: ${convResult.originalDate} (${convResult.originalCalendar}) → 변환된 양력: ${solarDate}`
+            : `\n- 양력: ${solarDate}`;
+
+        const timeWarning = rawData.userInfo.timeUnknown
+            ? '\n\n⚠️ **시간 정보 없음**: 상승궁(ASC)은 정오(12:00) 기준이므로 정확하지 않을 수 있습니다.'
             : '';
-        
-        const prompt = `
-${BASE_INSTRUCTION}
 
-**참고: 오늘은 2026년 2월 7일입니다**
+        const prompt = `
+${buildBaseInstruction()}
 
 [점성학 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
 - 생년월일: ${solarDate} ${rawData.userInfo.birthTime}${dateInfo}
 - 출생지: ${rawData.userInfo.location}${timeWarning}
 
-서양 점성학 관점에서 이 사람의:
+서양 점성학 관점에서:
 1. **Big 3 (태양/달/상승궁)**: 핵심 성격과 내면
 2. **주요 행성 배치**: 금성, 화성, 수성의 영향
-3. **현재 운행 흐름**: 2026년 주요 행성의 움직임이 미치는 영향
+3. **현재 운행 흐름**: 올해 주요 행성의 움직임이 미치는 영향
 
-**중요**: 점성학은 양력(태양력) 기반이므로, 위의 양력 날짜를 기준으로 분석하세요.
+**중요**: 점성학은 양력 기반이므로 위의 양력 날짜로 분석하세요.
 용어 설명은 최소화하고 실질적인 통찰을 제공하세요.
 `;
         const consultation = await callGeminiAPI(prompt);
         res.json({ success: true, consultation });
+
     } catch (error) {
         console.error("❌ [Astrology Error]", error);
-        res.json({ 
-            success: false, 
-            consultation: `점성학 분석 중 오류 발생.\n\n${error.message}` 
-        });
+        res.json({ success: false, error: `점성학 분석 오류: ${error.message}` });
     }
 });
 
-// [5-7] 점성학 운행 API (NEW!)
+// [10-5] 점성학 운행
 app.post('/api/astrology/transit', async (req, res) => {
     try {
         const { rawData, transitType } = req.body;
-        
+        const vErr = validateUserInfo(rawData?.userInfo);
+        if (vErr) return res.json({ success: false, error: vErr });
+
+        const now = new Date();
         const transitPrompts = {
             monthly: {
                 title: '이번 달 행성 운행',
                 maxLength: 700,
-                instruction: '이번 달(2026년 2월)의 주요 행성 운행과 그것이 사용자에게 미치는 영향을 700자 이내로 설명하세요.'
+                instruction: `${now.getFullYear()}년 ${now.getMonth() + 1}월의 주요 행성 운행과 그것이 사용자에게 미치는 영향을 700자 이내로 설명하세요.`
             },
             yearly: {
                 title: '올해 행성 운행',
                 maxLength: 1500,
-                instruction: '2026년 한 해 동안의 주요 행성 운행(목성, 토성, 천왕성 등)과 그 영향을 1500자 이내로 상세히 설명하세요.'
+                instruction: `${now.getFullYear()}년 한 해 동안의 주요 행성 운행(목성, 토성, 천왕성 등)과 그 영향을 1500자 이내로 상세히 설명하세요.`
             },
             decade: {
                 title: '10년 행성 운행',
                 maxLength: 4000,
-                instruction: '2026-2036년 10년간의 외행성(목성, 토성, 천왕성, 해왕성, 명왕성) 운행과 각 시기별 주요 영향을 4000자 이내로 깊이 있게 분석하세요.'
+                instruction: `${now.getFullYear()}-${now.getFullYear() + 10}년 10년간의 외행성(목성, 토성, 천왕성, 해왕성, 명왕성) 운행과 각 시기별 주요 영향을 4000자 이내로 깊이 있게 분석하세요.`
             }
         };
 
         const config = transitPrompts[transitType];
-        if (!config) {
-            return res.json({ success: false, error: '올바른 운행 타입이 아닙니다.' });
-        }
+        if (!config) return res.json({ success: false, error: '올바른 운행 타입이 아닙니다.' });
 
-        // 음력이면 양력으로 변환
-        const conversionResult = convertToSolar(rawData.userInfo);
-        const solarDate = conversionResult.birthDate;
-        
-        let dateInfo = '';
-        if (conversionResult.converted) {
-            dateInfo = ` (원본: ${conversionResult.originalDate} ${conversionResult.originalCalendar} → 변환: ${solarDate} 양력)`;
-        }
+        const convResult = convertToSolar(rawData.userInfo);
+        const solarDate = convResult.birthDate;
+        const dateInfo = convResult.converted
+            ? ` (원본: ${convResult.originalDate} ${convResult.originalCalendar} → 양력: ${solarDate})`
+            : '';
 
         const prompt = `
-${BASE_INSTRUCTION}
+${buildBaseInstruction()}
+
 [점성학 ${config.title} 분석]
 - 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
 - 출생 정보: ${solarDate} ${rawData.userInfo.birthTime}${dateInfo}
@@ -533,38 +564,57 @@ ${config.instruction}
 **중요**: 점성학은 양력 기반이므로 위의 양력 날짜로 분석하세요.
 답변은 반드시 ${config.maxLength}자를 초과하지 않도록 작성하세요.
 `;
-
-        const transit = await callGeminiAPI(prompt);
-        res.json({ 
-            success: true, 
-            transit: transit,
-            transitType: config.title
-        });
+        const transitTokenMap = { monthly: 1200, yearly: 2500, decade: 4000 };
+        const transit = await callGeminiAPI(prompt, transitTokenMap[transitType] || 2500);
+        res.json({ success: true, transit, transitType: config.title });
 
     } catch (error) {
         console.error("❌ [Transit Error]", error);
-        res.json({ 
-            success: false, 
-            error: '행성 운행 분석 중 오류가 발생했습니다.' 
-        });
+        res.json({ success: false, error: '행성 운행 분석 중 오류가 발생했습니다.' });
     }
 });
 
-// [5-8] 점성학 채팅 API
+// [10-6] 사주 채팅
+app.post('/api/saju/chat', async (req, res) => {
+    try {
+        const { userMessage, rawData } = req.body;
+        const sajuText = calculateSajuText(rawData.userInfo);
+        if (sajuText.startsWith('ERROR:')) {
+            return res.json({ success: true, answer: "죄송합니다. 사주 정보를 불러오는 중 오류가 발생했습니다." });
+        }
+
+        const prompt = `
+${buildBaseInstruction()}
+
+[사주 상세 상담 채팅]
+- 사용자: ${rawData.userInfo.name}
+- **확정 사주 명식: ${sajuText}**
+- 질문: "${userMessage}"
+
+🚨 **작성 지침:**
+1. 위 '확정 사주 명식'을 근거로 일관성 있게 답변하세요.
+2. 결론부터 말하고 사주적 이유를 설명하세요.
+`;
+        const answer = await callGeminiAPI(prompt);
+        res.json({ success: true, answer });
+
+    } catch (e) {
+        console.error("❌ [Saju Chat Error]", e);
+        res.status(500).json({ success: false, error: 'Chat Error' });
+    }
+});
+
+// [10-7] 점성학 채팅
 app.post('/api/astrology/chat', async (req, res) => {
     try {
         const { userMessage, rawData } = req.body;
-        
-        // 음력이면 양력으로 변환
-        const conversionResult = convertToSolar(rawData.userInfo);
-        const solarDate = conversionResult.birthDate;
-        
+        const convResult = convertToSolar(rawData.userInfo);
+        const solarDate = convResult.birthDate;
+
         const prompt = `
-${BASE_INSTRUCTION}
+${buildBaseInstruction()}
 
-**참고: 오늘은 2026년 2월 7일입니다**
-
-[상황: 점성학 상세 상담 채팅]
+[점성학 상세 상담 채팅]
 - 사용자: ${rawData.userInfo.name}
 - 출생 정보 (양력): ${solarDate} ${rawData.userInfo.birthTime}
 - 질문: "${userMessage}"
@@ -574,49 +624,167 @@ ${BASE_INSTRUCTION}
 `;
         const answer = await callGeminiAPI(prompt);
         res.json({ success: true, answer });
+
     } catch (e) {
+        console.error("❌ [Astrology Chat Error]", e);
         res.status(500).json({ success: false, error: 'Chat Error' });
     }
 });
-app.post('/api/saju/chat', async (req, res) => {
+
+// [10-8] 월간운세 30일 캘린더
+app.post('/api/saju/monthly-calendar', async (req, res) => {
     try {
-        const { userMessage, rawData } = req.body;
+        const { rawData, startDate } = req.body;
+
+        const vErr = validateUserInfo(rawData?.userInfo);
+        if (vErr) return res.json({ success: false, error: vErr });
+
         const sajuText = calculateSajuText(rawData.userInfo);
-        
-        if (!sajuText || sajuText.startsWith('ERROR:')) {
-             return res.json({ success: true, answer: "죄송합니다. 사주 정보를 불러오는 중 오류가 발생했습니다." });
+        if (sajuText.startsWith('ERROR:')) {
+            return res.json({ success: false, error: sajuText.replace('ERROR: ', '') });
         }
 
+        // 시작 날짜 (클라이언트에서 명시적으로 전달받음, 없으면 다음 달 1일)
+        let targetDate;
+        if (startDate && typeof startDate === 'string' && startDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            targetDate = new Date(startDate + 'T00:00:00');
+        } else {
+            const now = new Date();
+            targetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        }
+
+        const targetYear = targetDate.getFullYear();
+        const targetMonth = targetDate.getMonth() + 1;
+        const yi = getYearInfo(targetYear);
+
+        // ✅ 서버에서 30일 일진 정확히 계산
+        const jiljinData = calculate30DayJilJin(targetDate);
+        const jiljinText = jiljinData.map(d => `  ${d.date}: ${d.jiljin}일`).join('\n');
+
         const prompt = `
-${BASE_INSTRUCTION}
+${buildBaseInstruction()}
 
-**재확인: 오늘은 2026년 2월 7일, 병오년(붉은 말의 해)입니다**
+**재확인: 분석 기간은 ${targetYear}년 ${targetMonth}월, ${yi.ganji}년(${yi.color} ${yi.animal}의 해)입니다**
 
-[상황: 사주 상세 상담 채팅]
-- 사용자: ${rawData.userInfo.name}
-- **확정 사주 명식: ${sajuText}**
-- 질문: "${userMessage}"
+[30일 월간운세 캘린더 생성]
+- 이름: ${rawData.userInfo.name} (${rawData.userInfo.gender})
+- 사주 명식: ${sajuText}
+- 생년월일: ${rawData.userInfo.birthDate}
+- 분석 기간: ${targetYear}년 ${targetMonth}월 1일부터 30일까지
 
-🚨 **작성 지침:**
-1. 위 '확정 사주 명식'을 근거로 일관성 있게 답변하세요.
-2. 결론부터 말하고 사주적 이유를 설명하세요.
-3. 연도를 언급할 때는 2026년=병오년임을 명심하세요.
+**✅ 서버에서 정확히 계산된 30일 일진 (반드시 이 데이터를 사용하세요):**
+${jiljinText}
+
+**필수 출력 형식:**
+
+1. 전체 흐름 요약 (200자 이내)
+\`\`\`
+🔮 앞으로 30일의 흐름 (${targetYear}년 ${targetMonth}월)
+
+이번 달은 [초반/중반/후반]에 [상승/하락/안정] 패턴을 보입니다.
+[용신/희신]이 [강하게/약하게] 작용하는 시기로, [핵심 키워드] 에너지가 두드러집니다.
+
+**핵심:** [2-3문장으로 전체 흐름 요약]
+\`\`\`
+
+2. 에너지 흐름 그래프
+\`\`\`
+📊 30일 에너지 흐름
+
+ 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+[▇▆▅▄▃▂▁ 중 선택]
+
+16 17 18 19 20 21 22 23 24 25 26 27 28 29 30
+[▇▆▅▄▃▂▁ 중 선택]
+
+📈 최고점: [날짜] - [이유]
+⚠ 조심 구간: [날짜] - [이유]
+🔁 전환점: [날짜] - [이유]
+\`\`\`
+
+3. 핵심 인사이트
+\`\`\`
+⭐ 핵심 인사이트 요약
+
+이번 달 특징
+- 초반: [에너지 상태]
+- 중반: [에너지 상태]
+- 후반: [에너지 상태]
+
+가장 좋은 날 → [날짜들]
+조심할 구간 → [날짜들]
+\`\`\`
+
+4. 30일 달력 (${targetYear}년 ${targetMonth}월 실제 달력 요일 반영)
+\`\`\`
+📅 ${targetYear}년 ${targetMonth}월 운세 달력
+
+일  월  화  수  목  금  토
+[실제 달력 형태로 1-30일 배치]
+[각 날짜에 ⭐⭐/⭐/🔁/⚠/▪ 기호 표시]
+
+범례
+⭐⭐ 매우 강한 날  ⭐ 좋은 날  🔁 전환점  ⚠ 조심  ▪ 보통
+\`\`\`
+
+5. 상세 날짜 예시 3~5개 (최고점/최저점/전환점 위주)
+\`\`\`
+📅 ${targetMonth}월 [일]일 – [타이틀] [기호]
+
+일진: [위 제공된 일진 데이터 사용]
+
+🔑 키워드
+- [키워드1]
+- [키워드2]
+- [키워드3]
+
+🔮 해석
+[2-3문장 해석]
+
+💡 행동 제안
+👉 [구체적 행동 제안]
+
+📊 세부 운세
+- 재물운: [1줄]
+- 인간관계: [1줄]
+- 결정사항: [1줄]
+\`\`\`
+
+6. 상담 연결 유도
+\`\`\`
+🔗 더 알아보기
+
+> 특정 날의 연애운이나 사업 운세가 궁금하신가요?
+👉 채팅창에 질문을 남겨주세요.
+\`\`\`
+
+**계산 원칙:**
+- 위에서 제공한 일진 데이터를 반드시 사용하세요 (임의 계산 금지)
+- 사주 명식 "${sajuText}" 기반으로 용신/희신/기신 판단
+- 십성(比劫, 食傷, 財星, 官星, 印星)과 신살(천을귀인, 천덕귀인, 공망, 원진 등) 모두 고려
+- ${targetYear}년 ${targetMonth}월의 실제 달력 요일 정확히 반영
+
+답변은 반드시 4000자를 초과하지 않도록 작성하세요.
 `;
-        const answer = await callGeminiAPI(prompt);
-        res.json({ success: true, answer });
-    } catch (e) {
-        res.status(500).json({ success: false, error: 'Chat Error' });
+
+        const calendar = await callGeminiAPI(prompt, 4000);
+        res.json({
+            success: true,
+            calendar,
+            targetMonth: `${targetYear}년 ${targetMonth}월`,
+            sajuText,
+            jiljinData  // 프론트엔드에서도 활용 가능
+        });
+
+    } catch (error) {
+        console.error("❌ [Monthly Calendar Error]", error);
+        res.json({ success: false, error: '월간운세 캘린더 생성 중 오류가 발생했습니다.' });
     }
 });
 
-// [5-6] 점성학 채팅 API (서비스 예정)
-app.post('/api/astrology/chat', async (req, res) => {
-    res.json({ 
-        success: true, 
-        answer: '점성학 서비스는 현재 준비 중입니다. 조금만 기다려주세요! ⭐' 
-    });
-});
-
+// ─────────────────────────────────────────────
+// [11] 서버 시작
+// ─────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => console.log(`🚀 Server running: http://localhost:${PORT}`));
 }
