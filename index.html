@@ -757,26 +757,36 @@
         // 월간/주간 운세 하이라이트 카드 렌더링
         // ══════════════════════════════════════════
         function renderHighlight(data) {
-            const { highlightData, fortuneType } = data;
+            const highlightData = data.highlightData || {};
+            const typeLabel = data.fortuneType || '';
             const goodDays    = highlightData.good_days    || [];
             const cautionDays = highlightData.caution_days || [];
 
-            const makeChips = (days, type) => days.map(d => {
-                const dayLabel = typeof d.day === 'number' ? `${d.day}일` : d.day;
-                const icon = type === 'good' ? '✨' : '⚠️';
-                return `<div class="day-chip ${type}-chip">
-                    <span class="chip-day">${icon} ${dayLabel}</span>
-                    <span class="chip-label">${d.label || ''}</span>
-                    <span class="chip-reason">${d.detail || ''}</span>
-                </div>`;
-            }).join('') || '<span style="color:#555;font-size:0.8rem">해당 없음</span>';
+            const makeChips = (days, type) => {
+                if (!days.length) return '<span style="color:#555;font-size:0.8rem">해당 없음</span>';
+                return days.map(d => {
+                    const dayLabel = (d.day !== undefined && d.day !== null)
+                        ? (typeof d.day === 'number' ? `${d.day}일` : String(d.day))
+                        : '-';
+                    const icon = type === 'good' ? '✨' : '⚠️';
+                    return `<div class="day-chip ${type}-chip">
+                        <span class="chip-day">${icon} ${dayLabel}</span>
+                        <span class="chip-label">${d.label || ''}</span>
+                        <span class="chip-reason">${d.detail || ''}</span>
+                    </div>`;
+                }).join('');
+            };
 
-            const icon = fortuneType === '이번 달 운세' ? '📅' : '📆';
+            const icon = typeLabel.includes('달') ? '📅' : '📆';
+            const cardTitle = highlightData.title || typeLabel || '운세';
+            const summary = (highlightData.summary || '').replace(/\n/g, '<br>');
+            const advice  = highlightData.advice || '';
+
             const html = `
             <div class="monthly-card">
-                <div class="monthly-title">${icon} ${highlightData.title || fortuneType}</div>
-                <div class="monthly-summary">${(highlightData.summary || '').replace(/\n/g, '<br>')}</div>
-                <div class="monthly-advice">💡 ${highlightData.advice || ''}</div>
+                <div class="monthly-title">${icon} ${cardTitle}</div>
+                <div class="monthly-summary">${summary}</div>
+                <div class="monthly-advice">💡 ${advice}</div>
                 <div class="monthly-section-title good">⭐ 좋은 날</div>
                 <div class="day-chips">${makeChips(goodDays, 'good')}</div>
                 <div class="monthly-section-title bad">⚠️ 조심할 날</div>

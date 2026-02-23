@@ -451,7 +451,8 @@ app.post('/api/saju/fortune', async (req, res) => {
             const isMonthly = fortuneType === 'monthly';
             const typeLabel = isMonthly ? '월간' : '주간';
             const summaryLen = isMonthly ? 300 : 200;
-            const daysCount = isMonthly ? '3~5' : '2~3';
+            const daysCount = isMonthly ? '3~5개' : '2~3개';
+            const dayFormat = isMonthly ? '숫자(예: 5)' : '"월/일" 문자열(예: "2/24")';
 
             const structuredPrompt = `
 ${buildBaseInstruction()}
@@ -461,36 +462,35 @@ ${buildBaseInstruction()}
 - 사주 명식: ${sajuText}
 - 분석 기간: ${periodLabel}
 
-**✅ 기간 내 일진 (반드시 이 데이터 사용):**
+기간 내 일진:
 ${jiljinText}
 
-**🚨 아래 JSON 형식으로만 응답. 다른 텍스트 금지. 마크다운 코드블록 금지.**
+위 정보를 바탕으로 아래 규칙에 따라 JSON 하나만 출력하세요.
 
-{
-  "title": "${periodLabel} 운세",
-  "summary": "${summaryLen}자 이내로 이 기간 전체 에너지 흐름을 구체적으로 설명. 재물/인간관계/건강/결정 등 영역별로 나눠서 자세히 서술하세요.",
-  "advice": "이 기간 핵심 행동 조언 한 문장 (50자 이내)",
-  "good_days": [
-    { "day": "${isMonthly ? '날짜숫자' : '월/일 형식 문자열'}", "label": "한줄 제목 (10자 이내)", "detail": "이 날 왜 좋은지 구체적 설명 (30자 이내)" }
-  ],
-  "caution_days": [
-    { "day": "${isMonthly ? '날짜숫자' : '월/일 형식 문자열'}", "label": "한줄 제목 (10자 이내)", "detail": "이 날 왜 조심해야 하는지 (30자 이내)" }
-  ]
-}
+규칙:
+1. 출력은 반드시 JSON 객체 하나만. 다른 텍스트, 설명, 마크다운 코드블록 절대 금지.
+2. summary: ${summaryLen}자 이내. 재물/인간관계/건강/주요결정 영역별로 나눠 구체적으로 서술.
+3. advice: 50자 이내 핵심 행동 조언 한 문장.
+4. good_days: 용신 희신 강하게 작용하는 날 ${daysCount}. day 값은 ${dayFormat}.
+5. caution_days: 기신 공망 원진 작용하는 날 ${daysCount}. day 값은 ${dayFormat}.
+6. label: 10자 이내 한줄 제목. detail: 30자 이내 이유 설명.
 
-**기준:**
-- summary: 뻔한 이론 금지. 이 사람의 사주 명식 기반으로 구체적 통찰 제공
-- good_days: 용신/희신 작용하는 날 ${daysCount}개. ${isMonthly ? 'day는 숫자(1~31)' : 'day는 "2/24" 형식 문자열'}
-- caution_days: 기신/공망/원진 작용하는 날 ${daysCount}개. 같은 형식
-- JSON만 출력.
+출력 형식:
+{"title":"${periodLabel} 운세","summary":"전체 흐름 설명","advice":"핵심 조언","good_days":[{"day":${isMonthly ? '5' : '"2/24"'},"label":"제목","detail":"이유"}],"caution_days":[{"day":${isMonthly ? '13' : '"2/27"'},"label":"제목","detail":"이유"}]}
 `;
             const raw = await callGeminiAPI(structuredPrompt, 2000);
             let highlightData;
             try {
-                highlightData = JSON.parse(raw.replace(/```json|```/g, '').trim());
+                // JSON 블록 추출 시도 (```json ... ``` 포함 대응)
+                const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                // 중괄호 기준으로 JSON 부분만 추출
+                const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) throw new Error('JSON 블록을 찾을 수 없음');
+                highlightData = JSON.parse(jsonMatch[0]);
             } catch (e) {
-                console.error(`❌ ${typeLabel} JSON 파싱 실패:`, e.message, raw.slice(0, 200));
-                return res.json({ success: false, error: 'AI 응답 파싱 실패. 다시 시도해주세요.' });
+                console.error(`❌ ${typeLabel} JSON 파싱 실패:`, e.message);
+                console.error('원본 응답:', raw.slice(0, 300));
+                return res.json({ success: false, error: `${typeLabel} 운세 파싱 실패. 다시 시도해주세요.` });
             }
             return res.json({
                 success: true,
