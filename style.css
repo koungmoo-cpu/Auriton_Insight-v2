@@ -660,7 +660,7 @@ body {
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
     .main-container {
-        padding: 100px 20px 40px;
+        padding: 80px 15px 30px;
     }
 
     .method-grid {
@@ -671,15 +671,52 @@ body {
         left: 50%;
         transform: translateX(-50%);
         top: auto;
-        bottom: 20px;
+        bottom: 10px;
         flex-direction: row;
+        width: max-content;
+        max-width: 90vw;
     }
 
-    .form-container {
-        padding: 30px 20px;
+    .form-container, .result-container {
+        padding: 25px 15px;
     }
 
     .date-select-group {
         grid-template-columns: 1fr;
     }
+    
+    .section-title {
+        font-size: 1.8rem;
+    }
+    
+    .form-title {
+        font-size: 1.5rem;
+    }
+    
+    .card-title {
+        font-size: 1.3rem;
+    }
+    
+    .chat-input-wrapper {
+        gap: 8px;
+    }
+    
+    .chat-input {
+        min-width: 0;
+        font-size: 16px; /* Prevent iOS zoom */
+        padding: 12px 15px;
+    }
+    
+    .send-btn {
+        padding: 0 20px;
+    }
+    
+    .logo-wrapper {
+        gap: 8px;
+    }
+    
+    .site-title {
+        font-size: 1.4rem;
+    }
 }
+
