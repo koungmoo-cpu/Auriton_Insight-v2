@@ -771,6 +771,16 @@
     </section>
 
     <script>
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
         // ========== 공통 컴포넌트: 달력 타입 선택기 ==========
         function createCalendarTypeSelector(containerId, defaultType = 'solar', includeLeapMonth = true) {
             const container = document.getElementById(containerId);
@@ -890,10 +900,15 @@
             // 현재 스크롤 위치 저장
             const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 100;
 
-            // AI 메시지는 줄바꿈 처리 및 강조 표시
+            // AI 메시지는 줄바꿈 처리 및 강조 표시 (XSS 방지)
             if (sender === 'ai') {
                 div.className = 'ai-msg';
-                div.innerHTML = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<span class="strong-hl">$1</span>');
+                const escapedText = text.replace(/&/g, '&amp;')
+                                        .replace(/</g, '&lt;')
+                                        .replace(/>/g, '&gt;')
+                                        .replace(/"/g, '&quot;')
+                                        .replace(/'/g, '&#039;');
+                div.innerHTML = escapedText.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<span class="strong-hl">$1</span>');
             } else {
                 div.className = 'user-msg';
                 div.textContent = text;
@@ -1208,23 +1223,23 @@
                         : '-';
                     const icon = type === 'good' ? '✨' : '⚠️';
                     return `<div class="day-chip ${type}-chip">
-                        <span class="chip-day">${icon} ${dayLabel}</span>
-                        <span class="chip-label">${d.label || ''}</span>
-                        <span class="chip-reason">${d.detail || ''}</span>
+                        <span class="chip-day">${icon} ${escapeHTML(dayLabel)}</span>
+                        <span class="chip-label">${escapeHTML(d.label || '')}</span>
+                        <span class="chip-reason">${escapeHTML(d.detail || '')}</span>
                     </div>`;
                 }).join('');
             };
 
             const icon = typeLabel.includes('달') ? '📅' : '📆';
             const cardTitle = highlightData.title || typeLabel || '운세';
-            const summary = (highlightData.summary || '').replace(/\n/g, '<br>');
+            const summary = escapeHTML(highlightData.summary || '').replace(/\n/g, '<br>');
             const advice = highlightData.advice || '';
 
             const html = `
             <div class="monthly-card">
-                <div class="monthly-title">${icon} ${cardTitle}</div>
+                <div class="monthly-title">${icon} ${escapeHTML(cardTitle)}</div>
                 <div class="monthly-summary">${summary}</div>
-                <div class="monthly-advice">💡 ${advice}</div>
+                <div class="monthly-advice">💡 ${escapeHTML(advice)}</div>
                 <div class="monthly-section-title good">⭐ 좋은 날</div>
                 <div class="day-chips">${makeChips(goodDays, 'good')}</div>
                 <div class="monthly-section-title bad">⚠️ 조심할 날</div>
