@@ -630,6 +630,8 @@ body {
     font-weight: bold;
     cursor: pointer;
     transition: all 0.3s;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .send-btn:hover {

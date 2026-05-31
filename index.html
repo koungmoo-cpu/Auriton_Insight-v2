@@ -764,7 +764,7 @@
             </div>
 
             <div class="chat-input-area" id="chat-input-area">
-                <input type="text" id="user-msg" class="chat-input" placeholder="궁금한 것을 자유롭게 물어보세요 (예: 올해 건강은 어떨까요?)">
+                <textarea id="user-msg" class="chat-input" placeholder="궁금한 것을 자유롭게 물어보세요 (예: 올해 건강은 어떨까요?)" rows="1" style="resize: none; overflow-y: hidden; height: 52px; font-family: inherit; box-sizing: border-box; line-height: 1.5;" oninput="this.style.height = '52px'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
                 <button onclick="sendChat()" class="send-btn">질문하기</button>
             </div>
         </div>
@@ -1120,6 +1120,7 @@
             // 내가 쓴 메시지 화면에 표시
             appendMsg('user', msg);
             input.value = '';
+            input.style.height = '52px';
 
             // 서버로 전송 (currentUserInfo를 같이 보냅니다!)
             if ((currentMode === 'saju' || currentMode === 'astrology') && currentUserInfo) {
@@ -1388,8 +1389,11 @@
         });
 
         // 엔터키 입력 시 전송
-        document.getElementById('user-msg').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') sendChat();
+        document.getElementById('user-msg').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChat();
+            }
         });
     </script>
 </body>

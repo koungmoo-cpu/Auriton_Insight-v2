@@ -414,7 +414,7 @@ app.post('/api/saju/fortune', async (req, res) => {
         if (!config) return res.json({ success: false, error: '올바른 운세 타입이 아닙니다.' });
 
         // ── monthly / weekly: JSON 구조 반환 (상세 요약 + 주요 날 하이라이트)
-        if (fortuneType === 'monthly' || fortuneType === 'weekly') {
+        if (false) { // fortuneType === 'monthly' || fortuneType === 'weekly'
             const now2 = new Date();
             const targetYear = now2.getFullYear();
             const targetMonth = now2.getMonth() + 1;
